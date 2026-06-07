@@ -1,6 +1,14 @@
 services:
   iso-web:
     build: .
+    environment:
+      PORT: "8018"
+      TEMPLATES_AUTO_RELOAD: "1"
     ports:
-      - "8000:8000"
+      - "8018:8018"
+    volumes:
+      - ./app.py:/app/app.py:ro
+      - ./backend:/app/backend:ro
+      - ./frontend:/app/frontend:ro
+    command: ["gunicorn", "--reload", "--bind", "0.0.0.0:8018", "app:app"]
     restart: unless-stopped

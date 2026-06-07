@@ -20,9 +20,12 @@ docs/                 推导说明
 docker compose up --build -d
 ```
 
-打开 `http://127.0.0.1:8000`。
+打开 `http://127.0.0.1:8018`。
 
 Docker 会安装 `requirements.txt` 中的 Flask、numpy、scipy 和 gunicorn。
+`docker-compose.yml` 会把 `app.py`、`backend/` 和 `frontend/` 挂载到容器内：
+前端静态文件或模板的小改动通常刷新页面即可；Python 代码改动会触发 gunicorn `--reload` 自动重启。
+只有改了 `requirements.txt`、`Dockerfile` 或系统依赖时，才需要重新 build。
 
 ## 本地开发
 
@@ -33,7 +36,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-打开 `http://127.0.0.1:8000`。
+打开 `http://127.0.0.1:8018`。
 
 ## 功能
 

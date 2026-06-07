@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
@@ -15,6 +16,9 @@ app = Flask(
     static_folder=str(PROJECT_ROOT / "frontend" / "static"),
     static_url_path="/static",
 )
+templates_auto_reload = os.getenv("TEMPLATES_AUTO_RELOAD")
+if templates_auto_reload is not None:
+    app.config["TEMPLATES_AUTO_RELOAD"] = templates_auto_reload.lower() in {"1", "true", "yes"}
 
 
 @app.get("/")
@@ -53,4 +57,4 @@ def optional_float(value):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "8018")), debug=True)
