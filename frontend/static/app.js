@@ -1,16 +1,20 @@
 const form = document.querySelector("#validationForm");
 const statusCard = document.querySelector("#statusCard");
 const chart = document.querySelector("#chart");
+const specFields = {
+  lsl: document.querySelector('[data-spec-field="lsl"]'),
+  usl: document.querySelector('[data-spec-field="usl"]'),
+};
 
 const example = {
   title_label: "关键结构件尺寸",
   samples:
     "50.1, 48.9, 51.2, 49.5, 50.6, 52.1, 48.5, 50.0, 49.8, 51.0,\n50.5, 49.2, 51.8, 50.1, 49.9, 51.1, 48.8, 50.3, 49.6, 50.8",
-  scenario: "two-sided",
+  scenario: "lower",
   p_target: "0.95",
   conf_target: "0.95",
   lsl: "47.5",
-  usl: "52.5",
+  usl: "",
 };
 
 document.querySelector("#loadExample").addEventListener("click", () => {
@@ -22,6 +26,8 @@ document.querySelector("#loadExample").addEventListener("click", () => {
     }
   }
   updateHeaderRates();
+  updateResultContext();
+  updateSpecFields();
   submitForm();
 });
 
@@ -34,9 +40,42 @@ for (const name of ["p_target", "conf_target"]) {
   form.elements[name].addEventListener("input", updateHeaderRates);
 }
 
+form.elements.title_label.addEventListener("input", updateResultContext);
+
+for (const item of form.elements.scenario) {
+  item.addEventListener("change", () => {
+    updateResultContext();
+    updateSpecFields();
+  });
+}
+
 function updateHeaderRates() {
-  document.querySelector("#heroP").textContent = `${(Number(form.elements.p_target.value) * 100).toFixed(1)}%`;
-  document.querySelector("#heroConf").textContent = `${(Number(form.elements.conf_target.value) * 100).toFixed(1)}%`;
+  document.querySelector("#heroP").textContent = formatRate(form.elements.p_target.value);
+  document.querySelector("#heroConf").textContent = formatRate(form.elements.conf_target.value);
+}
+
+function updateResultContext() {
+  const title = form.elements.title_label.value.trim() || "产品特性";
+  const scenario = new FormData(form).get("scenario");
+  setText("#chartFeatureName", title);
+  setText("#scenarioBadge", scenarioLabel(scenario));
+}
+
+function updateSpecFields() {
+  const scenario = new FormData(form).get("scenario");
+  form.dataset.scenario = scenario;
+  const showLsl = scenario !== "upper";
+  const showUsl = scenario !== "lower";
+  setSpecField(specFields.lsl, form.elements.lsl, showLsl);
+  setSpecField(specFields.usl, form.elements.usl, showUsl);
+}
+
+function setSpecField(container, input, visible) {
+  container.hidden = !visible;
+  input.disabled = !visible;
+  if (!visible) {
+    input.value = "";
+  }
 }
 
 async function submitForm() {
@@ -62,6 +101,8 @@ function renderResult(data) {
   const state = data.passed === true ? "pass" : data.passed === false ? "fail" : "neutral";
   const title = data.passed === true ? "合格" : data.passed === false ? "不合格" : "已计算";
   setStatus(state, title, data.verdict);
+  setText("#chartFeatureName", data.title_label);
+  setText("#scenarioBadge", scenarioLabel(data.scenario));
 
   setText("#nValue", data.n);
   setText("#meanValue", fmt(data.mean));
@@ -93,6 +134,7 @@ function drawChart(plot, scenario) {
   const yMax = plot.y_max * 1.14;
   const xScale = (x) => pad.left + ((x - xMin) / (xMax - xMin)) * innerW;
   const yScale = (y) => pad.top + innerH - (y / yMax) * innerH;
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
   const points = plot.x.map((x, index) => `${xScale(x).toFixed(2)},${yScale(plot.y[index]).toFixed(2)}`);
   const areaPoints = [
@@ -111,11 +153,13 @@ function drawChart(plot, scenario) {
 
   const markerLines = plot.markers
     .map((marker, index) => {
-      const x = xScale(marker.value);
+      const rawX = xScale(marker.value);
+      const x = clamp(rawX, pad.left, pad.left + innerW);
       const labelY = pad.top + 16 + (index % 4) * 18;
+      const labelX = clamp(x + 6, pad.left + 6, width - 120);
       return `
         <line class="marker ${marker.kind}" x1="${x}" y1="${pad.top}" x2="${x}" y2="${pad.top + innerH}" />
-        <text class="chart-label" x="${Math.min(x + 6, width - 120)}" y="${labelY}">${marker.label} ${fmt(marker.value)}</text>
+        <text class="chart-label" x="${labelX}" y="${labelY}">${marker.label} ${fmt(marker.value)}</text>
       `;
     })
     .join("");
@@ -173,6 +217,11 @@ function fmtNullable(value) {
   return value === null || value === undefined ? "未设置" : fmt(value);
 }
 
+function formatRate(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? `${(number * 100).toFixed(1)}%` : "--";
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -183,4 +232,5 @@ function escapeHtml(value) {
 }
 
 updateHeaderRates();
-submitForm();
+updateResultContext();
+updateSpecFields();

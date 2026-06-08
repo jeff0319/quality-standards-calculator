@@ -4,66 +4,66 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ISO 16269-6 宣称值与规格验证</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <main class="shell">
-      <header class="topbar">
-        <div>
-          <p class="kicker">ISO 16269-6</p>
-          <h1>产品宣称值与规格验证</h1>
-        </div>
-        <div class="top-actions">
-          <span>p <strong id="heroP">95%</strong></span>
-          <span>Confidence <strong id="heroConf">95%</strong></span>
-        </div>
-      </header>
-
       <section class="layout">
-        <form id="validationForm" class="panel controls">
-          <div class="panel-title">
-            <h2>输入</h2>
-            <button class="subtle-button" type="button" id="loadExample">示例</button>
-          </div>
+        <div class="left-stack">
+          <header class="topbar">
+            <img class="brand-icon" src="/static/favicon.svg" alt="" aria-hidden="true" />
+            <div>
+              <p class="kicker">ISO 16269-6</p>
+              <h1>产品宣称值与规格验证</h1>
+            </div>
+          </header>
 
-          <label>
-            产品特性
-            <input name="title_label" value="关键结构件尺寸" placeholder="关键结构件尺寸" />
-          </label>
+          <form id="validationForm" class="panel controls">
+            <div class="panel-title">
+              <h2>输入</h2>
+              <button class="subtle-button" type="button" id="loadExample">示例</button>
+            </div>
 
-          <label>
-            样本数据
-            <textarea name="samples" rows="8" spellcheck="false">50.1, 48.9, 51.2, 49.5, 50.6, 52.1, 48.5, 50.0, 49.8, 51.0,
-50.5, 49.2, 51.8, 50.1, 49.9, 51.1, 48.8, 50.3, 49.6, 50.8</textarea>
-          </label>
-
-          <div class="segmented" role="radiogroup" aria-label="验证类型">
-            <label><input type="radio" name="scenario" value="two-sided" checked /> 双侧</label>
-            <label><input type="radio" name="scenario" value="lower" /> 下限</label>
-            <label><input type="radio" name="scenario" value="upper" /> 上限</label>
-          </div>
-
-          <div class="field-grid">
             <label>
-              覆盖率 p
-              <input name="p_target" type="number" min="0.5" max="0.999" step="0.001" value="0.95" />
+              特性名称
+              <input name="title_label" value="关键结构件尺寸" placeholder="例如：关键结构件尺寸" />
             </label>
-            <label>
-              置信度
-              <input name="conf_target" type="number" min="0.5" max="0.999" step="0.001" value="0.95" />
-            </label>
-            <label>
-              LSL
-              <input name="lsl" type="number" step="any" value="47.5" placeholder="留空" />
-            </label>
-            <label>
-              USL
-              <input name="usl" type="number" step="any" value="52.5" placeholder="留空" />
-            </label>
-          </div>
 
-          <button class="primary-button" type="submit">计算</button>
-        </form>
+            <label>
+              样本数据
+              <textarea name="samples" rows="4" spellcheck="false" placeholder="可用逗号或空格分隔，例如：50.1, 48.9, 51.2 或 50.1 48.9 51.2"></textarea>
+              <span class="field-note">支持逗号、中文逗号、分号、换行或空格分隔。</span>
+            </label>
+
+            <div class="segmented" role="radiogroup" aria-label="验证类型">
+              <label><input type="radio" name="scenario" value="lower" checked /> 下限</label>
+              <label><input type="radio" name="scenario" value="upper" /> 上限</label>
+              <label><input type="radio" name="scenario" value="two-sided" /> 双侧</label>
+            </div>
+
+            <div class="field-grid">
+              <label>
+                覆盖率 p
+                <input name="p_target" type="number" min="0.5" max="0.999" step="0.001" value="0.95" />
+              </label>
+              <label>
+                置信度
+                <input name="conf_target" type="number" min="0.5" max="0.999" step="0.001" value="0.95" />
+              </label>
+              <label data-spec-field="lsl">
+                LSL
+                <input name="lsl" type="number" step="any" placeholder="留空" />
+              </label>
+              <label data-spec-field="usl">
+                USL
+                <input name="usl" type="number" step="any" placeholder="留空" />
+              </label>
+            </div>
+
+            <button class="primary-button" type="submit">计算</button>
+          </form>
+        </div>
 
         <section class="main-stack">
           <div id="statusCard" class="status-card neutral">
@@ -73,7 +73,7 @@
 
           <div class="summary-grid">
             <article><span>n</span><strong id="nValue">--</strong></article>
-            <article><span>X-bar</span><strong id="meanValue">--</strong></article>
+            <article><span>x&#772;</span><strong id="meanValue">--</strong></article>
             <article><span>s</span><strong id="stdValue">--</strong></article>
             <article><span>k</span><strong id="kValue">--</strong></article>
             <article class="claim"><span id="claimLabel">宣称值</span><strong id="claimValue">--</strong></article>
@@ -81,8 +81,11 @@
 
           <section class="panel chart-panel">
             <div class="panel-title compact">
-              <h2>容差区间与规格线</h2>
-              <div class="legend">
+              <h2><span id="chartFeatureName">关键结构件尺寸</span>：容差区间与规格线</h2>
+              <div class="chart-head-meta">
+                <span id="scenarioBadge">下限统计容差区间</span>
+                <span>覆盖率 <strong id="heroP">95.0%</strong></span>
+                <span>置信度 <strong id="heroConf">95.0%</strong></span>
                 <span class="legend-item tolerance">LTL / UTL</span>
                 <span class="legend-item spec">LSL / USL</span>
               </div>
@@ -96,6 +99,148 @@
             <article><span>LSL</span><strong id="lslValue">--</strong></article>
             <article><span>USL</span><strong id="uslValue">--</strong></article>
           </div>
+
+          <details class="panel theory-panel">
+            <summary>
+              <span>理论依据</span>
+              <strong>ISO 16269-6 正态统计容差限</strong>
+            </summary>
+            <div class="theory-content">
+              <section class="theory-section">
+                <h3>核心问题</h3>
+                <p>
+                  ISO 16269-6 中的统计容差区间不是均值置信区间，也不是预测区间。它关注的是由样本计算出的随机界限，
+                  能否以规定置信度覆盖总体中至少给定比例的个体。设总体特性值服从正态分布：
+                </p>
+                <div class="equation">X ∼ N(μ, σ<sup>2</sup>)</div>
+                <p>
+                  给定覆盖率 <var>p</var> 与置信度 <span class="math">γ = 1 - α</span>，核心问题是求容差因子
+                  <var>k</var>。单侧容差限可精确转化为非中心 <var>t</var> 分布；双侧容差区间通常需要数值积分或高精度近似。
+                </p>
+              </section>
+
+              <section class="theory-section">
+                <h3>1. 单侧容差区间：非中心 t 分布精确解</h3>
+                <p>以上容差限为例：</p>
+                <div class="equation">U = x&#772; + ks</div>
+                <p>
+                  希望 <span class="math">U</span> 至少覆盖总体中比例 <var>p</var> 的个体，并且这一命题在重复抽样意义下以置信度
+                  <span class="math">1 - α</span> 成立：
+                </p>
+                <div class="equation">
+                  P<sub>sample</sub>{P<sub>X</sub>(X ≤ x&#772; + ks | x&#772;, s) ≥ p} = 1 - α
+                </div>
+                <p>
+                  对正态总体而言，总体的 <var>p</var> 分位数为 <span class="math">μ + z<sub>p</sub>σ</span>，其中
+                  <span class="math">z<sub>p</sub> = Φ<sup>-1</sup>(p)</span>。因此覆盖比例至少为 <var>p</var> 等价于：
+                </p>
+                <div class="equation">x&#772; + ks ≥ μ + z<sub>p</sub>σ</div>
+              </section>
+
+              <section class="theory-section">
+                <h3>1.1 标准化与移项</h3>
+                <p>
+                  从覆盖条件出发，移项并除以 <span class="math">σ / √n</span>：
+                </p>
+                <div class="equation-list">
+                  <div>x&#772; - μ - z<sub>p</sub>σ ≥ -ks</div>
+                  <div>(x&#772; - μ) / (σ / √n) - z<sub>p</sub>√n ≥ -k√n(s / σ)</div>
+                </div>
+                <p>
+                  取相反数，不等号方向改变；由于 <span class="math">s / σ &gt; 0</span>，继续除以该正数：
+                </p>
+                <div class="equation">
+                  ((μ - x&#772;) / (σ / √n) + z<sub>p</sub>√n) / (s / σ) ≤ k√n
+                </div>
+              </section>
+
+              <section class="theory-section">
+                <h3>1.2 引入非中心 t 分布</h3>
+                <p>
+                  正态样本有如下经典抽样分布，且 <span class="math">Z</span> 与 <span class="math">V</span> 相互独立：
+                </p>
+                <div class="equation-list">
+                  <div>Z = √n(x&#772; - μ) / σ ∼ N(0, 1)</div>
+                  <div>V = (n - 1)s<sup>2</sup> / σ<sup>2</sup> ∼ χ<sup>2</sup><sub>n-1</sub></div>
+                  <div>ν = n - 1, &nbsp; s / σ = √(V / ν)</div>
+                </div>
+                <p>
+                  代入上一节的不等式，得到：
+                </p>
+                <div class="equation">(z<sub>p</sub>√n - Z) / √(V / ν) ≤ k√n</div>
+                <p>
+                  令 <span class="math">δ = z<sub>p</sub>√n</span>。因为 <span class="math">-Z ∼ N(0, 1)</span>，所以
+                  <span class="math">δ - Z</span> 是均值为 <span class="math">δ</span>、方差为 1 的正态变量，并且与
+                  <span class="math">V</span> 独立。根据非中心 <var>t</var> 分布定义：
+                </p>
+                <div class="equation">T = (δ - Z) / √(V / ν) ∼ t<sub>ν,δ</sub></div>
+                <p>
+                  因此单侧容差因子满足：
+                </p>
+                <div class="equation">P(T ≤ k√n) = 1 - α</div>
+                <div class="equation">k = t<sub>ν,δ;1-α</sub> / √n</div>
+                <p>
+                  这就是单侧正态容差限的精确数学来源。单侧下容差限
+                  <span class="math">L = x&#772; - ks</span> 的推导完全对称。
+                </p>
+              </section>
+
+              <section class="theory-section">
+                <h3>2. 双侧容差区间：积分方程与近似解</h3>
+                <p>双侧正态容差区间写为：</p>
+                <div class="equation">[x&#772; - ks, x&#772; + ks]</div>
+                <p>
+                  它要求区间覆盖总体中至少比例 <var>p</var> 的个体，并以置信度 <span class="math">1 - α</span> 成立：
+                </p>
+                <div class="equation">
+                  P<sub>sample</sub>{Φ((x&#772; + ks - μ) / σ) - Φ((x&#772; - ks - μ) / σ) ≥ p} = 1 - α
+                </div>
+                <p>
+                  双侧问题比单侧复杂，因为区间中心 <span class="math">x&#772;</span> 与半宽
+                  <span class="math">ks</span> 同时随机变化，覆盖条件中二者以非线性方式共同出现。
+                </p>
+              </section>
+
+              <section class="theory-section">
+                <h3>2.1 联合抽样分布与 Owen 型积分</h3>
+                <p>
+                  仍令 <span class="math">Z = √n(x&#772; - μ) / σ</span>，
+                  <span class="math">V = (n - 1)s<sup>2</sup> / σ<sup>2</sup></span>，且
+                  <span class="math">ν = n - 1</span>。双侧覆盖比例可写成：
+                </p>
+                <div class="equation">
+                  Φ(Z / √n + k√(V / ν)) - Φ(Z / √n - k√(V / ν))
+                </div>
+                <p>
+                  目标是寻找 <var>k</var>，使满足覆盖比例不少于 <var>p</var> 的
+                  <span class="math">(Z,V)</span> 区域的联合概率等于 <span class="math">1 - α</span>。利用独立性，可写成对卡方变量的条件积分：
+                </p>
+                <div class="equation">
+                  ∫<sub>0</sub><sup>∞</sup> P[Φ(Z / √n + k√(v / ν)) - Φ(Z / √n - k√(v / ν)) ≥ p | V = v] f<sub>χ²ν</sub>(v) dv = 1 - α
+                </div>
+                <p>
+                  该方程一般需要数值积分和迭代求解。Owen 关于正态双侧容差限的工作，正是将这类概率问题转化为可计算的积分形式。
+                </p>
+              </section>
+
+              <section class="theory-section">
+                <h3>3. 双侧工程近似：Wald-Wolfowitz 思路</h3>
+                <p>工程近似通常由三个因素组合而来。</p>
+                <div class="equation-list">
+                  <div>中心已知时，覆盖中心对称比例 p 的半宽为 z<sub>(1+p)/2</sub>σ</div>
+                  <div>x&#772; 有抽样波动，需要中心估计修正 √(1 + 1/n)</div>
+                  <div>σ 未知并以 s 估计，需要卡方下分位数修正 √((n - 1) / χ<sup>2</sup><sub>n-1,α</sub>)</div>
+                </div>
+                <p>组合后得到 Wald-Wolfowitz 型近似：</p>
+                <div class="equation">
+                  k ≈ z<sub>(1+p)/2</sub> √(1 + 1/n) √((n - 1) / χ<sup>2</sup><sub>n-1,α</sub>)
+                </div>
+                <p>
+                  该公式直观、易算，但在小样本时精度有限。工程软件和现代标准表格通常采用更高精度的积分计算或修正近似。
+                </p>
+              </section>
+            </div>
+          </details>
         </section>
       </section>
     </main>

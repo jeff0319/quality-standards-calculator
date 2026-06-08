@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isfinite
+import re
 from typing import Iterable
 
 import numpy as np
@@ -55,15 +56,7 @@ class ValidationResult:
 
 def parse_samples(raw: str | Iterable[float]) -> list[float]:
     if isinstance(raw, str):
-        cleaned = (
-            raw.replace("，", ",")
-            .replace("；", ",")
-            .replace(";", ",")
-            .replace("\n", ",")
-            .replace("\t", ",")
-            .replace(" ", ",")
-        )
-        values = [item.strip() for item in cleaned.split(",") if item.strip()]
+        values = [item for item in re.split(r"[\s,，;；]+", raw.strip()) if item]
         if not values:
             raise ValueError("请输入样本数据。")
         try:
@@ -198,8 +191,10 @@ def build_plot(
 ) -> dict[str, object]:
     bounds = [mean - 4.5 * std, mean + 4.5 * std, float(np.min(samples)), float(np.max(samples))]
     if lsl is not None:
+        bounds.append(lsl + std)
         bounds.append(lsl - std)
     if usl is not None:
+        bounds.append(usl - std)
         bounds.append(usl + std)
     if isfinite(ltl):
         bounds.append(ltl - std * 0.4)
@@ -210,7 +205,7 @@ def build_plot(
     xs = np.linspace(x_min, x_max, 220)
     ys = norm.pdf(xs, mean, std)
 
-    markers = [{"key": "mean", "label": "X-bar", "value": mean, "kind": "mean"}]
+    markers = [{"key": "mean", "label": "x\u0304", "value": mean, "kind": "mean"}]
     if isfinite(ltl):
         markers.append({"key": "ltl", "label": "LTL", "value": ltl, "kind": "tolerance"})
     if isfinite(utl):
