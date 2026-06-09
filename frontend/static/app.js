@@ -79,6 +79,7 @@ document.querySelector("#loadExample").addEventListener("click", () => {
   updateHeaderRates();
   updateResultContext();
   updateSpecFields();
+  updateTwoSidedOptions();
   submitForm();
 });
 
