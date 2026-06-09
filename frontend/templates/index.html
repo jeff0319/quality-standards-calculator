@@ -106,6 +106,14 @@
               <label><input type="radio" name="scenario" value="two-sided" /> 双侧</label>
             </div>
 
+            <div class="method-panel" id="twoSidedOptions" hidden>
+              <div class="segmented small" role="radiogroup" aria-label="双侧算法">
+                <label><input type="radio" name="two_sided_method" value="fast" checked /> 快速</label>
+                <label><input type="radio" name="two_sided_method" value="exact" /> 精确</label>
+              </div>
+              <span class="field-note">精确算法会进行数值积分，低配服务器可能耗时较长；可停止页面等待，后端最长约 30 秒自动保护。</span>
+            </div>
+
             <div class="field-grid">
               <label>
                 覆盖率 p
@@ -125,7 +133,13 @@
               </label>
             </div>
 
-            <button class="primary-button" type="submit">计算</button>
+            <div class="action-row">
+              <button class="primary-button" type="submit" id="submitButton">
+                <span id="submitLabel">计算</span>
+                <small id="elapsedValue" hidden>--</small>
+              </button>
+              <button class="subtle-button" type="button" id="cancelButton" hidden>停止</button>
+            </div>
           </form>
         </div>
 

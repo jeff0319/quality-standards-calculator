@@ -27,6 +27,8 @@ Docker 会安装 `requirements.txt` 中的 Flask、numpy、scipy 和 gunicorn。
 前端静态文件或模板的小改动通常刷新页面即可；Python 代码改动会触发 gunicorn `--reload` 自动重启。
 只有改了 `requirements.txt`、`Dockerfile` 或系统依赖时，才需要重新 build。
 
+双侧正态容差区间默认使用快速工程近似，适合 VPS 部署。页面中可切换为精确数值积分，并提供停止按钮；精确解会显著增加 CPU 开销，不建议在低配 Web 服务中作为默认模式。
+
 ## 本地开发
 
 ```bash

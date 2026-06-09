@@ -6,8 +6,15 @@ const specFields = {
   usl: document.querySelector('[data-spec-field="usl"]'),
 };
 const extraResult = document.querySelector("#extraResult");
+const submitButton = document.querySelector("#submitButton");
+const submitLabel = document.querySelector("#submitLabel");
+const cancelButton = document.querySelector("#cancelButton");
+const twoSidedOptions = document.querySelector("#twoSidedOptions");
 let currentResult = null;
 let selectedGroupIndex = 0;
+let activeController = null;
+let activeStartedAt = 0;
+let elapsedTimer = null;
 
 const example = {
   title_label: "关键结构件尺寸",
@@ -55,6 +62,12 @@ extraResult.addEventListener("click", (event) => {
   renderPooledSelection(currentResult, Number(row.dataset.groupIndex));
 });
 
+cancelButton.addEventListener("click", () => {
+  if (activeController) {
+    activeController.abort();
+  }
+});
+
 document.querySelector("#loadExample").addEventListener("click", () => {
   for (const [key, value] of Object.entries(example)) {
     if (key === "scenario") {
@@ -81,7 +94,10 @@ for (const name of ["p_target", "conf_target"]) {
 form.elements.title_label.addEventListener("input", updateResultContext);
 
 for (const item of form.elements.method) {
-  item.addEventListener("change", updateMethodPanels);
+  item.addEventListener("change", () => {
+    updateMethodPanels();
+    updateTwoSidedOptions();
+  });
 }
 
 for (const item of form.elements.rank_mode) {
@@ -92,6 +108,7 @@ for (const item of form.elements.scenario) {
   item.addEventListener("change", () => {
     updateResultContext();
     updateSpecFields();
+    updateTwoSidedOptions();
   });
 }
 
@@ -125,22 +142,48 @@ function setSpecField(container, input, visible) {
 }
 
 async function submitForm() {
-  const payload = buildPayload();
-  setStatus("neutral", "计算中", "正在生成容差边界...");
-
-  const response = await fetch("/api/validate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    setStatus("fail", "输入错误", data.error || "计算失败");
-    return;
+  if (activeController) {
+    activeController.abort();
   }
+  const controller = new AbortController();
+  activeController = controller;
+  activeStartedAt = performance.now();
+  const payload = buildPayload();
+  const exactMode = payload.scenario === "two-sided" && payload.two_sided_method === "exact";
+  setBusy(true);
+  startElapsedTimer();
+  setStatus("neutral", exactMode ? "精确计算中" : "计算中", exactMode ? "正在执行双侧数值积分，可点击停止取消等待..." : "正在生成容差边界...");
 
-  renderResult(data);
+  try {
+    const response = await fetch("/api/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      setStatus("fail", "输入错误", data.error || "计算失败");
+      return;
+    }
+
+    renderResult(data);
+  } catch (error) {
+    if (error.name === "AbortError") {
+      if (activeController === controller) {
+        setStatus("neutral", "已停止", `已取消本次计算等待，已等待 ${formatElapsed(performance.now() - activeStartedAt)}。`);
+      }
+      return;
+    }
+    setStatus("fail", "计算失败", "请求未完成，请稍后重试。");
+  } finally {
+    if (activeController === controller) {
+      activeController = null;
+      stopElapsedTimer();
+      setBusy(false);
+    }
+  }
 }
 
 function renderResult(data) {
@@ -163,6 +206,7 @@ function renderResult(data) {
   setText("#uslValue", fmtNullable(data.usl));
   setText("#claimLabel", data.claim.label);
   setText("#claimValue", data.claim.text);
+  setElapsed(data.elapsed_ms);
 
   renderExtraResult(data);
   if (data.method === "normal-pooled") {
@@ -184,6 +228,27 @@ function buildPayload() {
   return payload;
 }
 
+function setBusy(isBusy) {
+  submitButton.disabled = isBusy;
+  submitLabel.textContent = isBusy ? "计算中" : "计算";
+  cancelButton.hidden = !isBusy;
+}
+
+function startElapsedTimer() {
+  stopElapsedTimer();
+  setElapsed(0);
+  elapsedTimer = window.setInterval(() => {
+    setElapsed(performance.now() - activeStartedAt);
+  }, 100);
+}
+
+function stopElapsedTimer() {
+  if (elapsedTimer) {
+    window.clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
+}
+
 function updateMethodPanels() {
   const method = new FormData(form).get("method");
   for (const panel of document.querySelectorAll("[data-method-panel]")) {
@@ -191,6 +256,16 @@ function updateMethodPanels() {
   }
   form.elements.samples.closest("label").hidden = method === "normal-pooled";
   updateRankFields();
+}
+
+function updateTwoSidedOptions() {
+  const method = new FormData(form).get("method");
+  const scenario = new FormData(form).get("scenario");
+  const visible = scenario === "two-sided" && method !== "distribution-free";
+  twoSidedOptions.hidden = !visible;
+  for (const input of twoSidedOptions.querySelectorAll("input")) {
+    input.disabled = !visible;
+  }
 }
 
 function updateRankFields() {
@@ -338,7 +413,16 @@ function pooledSpecCells(data) {
 
 function setStatus(kind, label, text) {
   statusCard.className = `status-card ${kind}`;
-  statusCard.innerHTML = `<span>${escapeHtml(label)}</span><strong>${escapeHtml(text)}</strong>`;
+  statusCard.querySelector("span").textContent = label;
+  statusCard.querySelector("strong").textContent = text;
+}
+
+function setElapsed(ms) {
+  document.querySelector("#elapsedValue").hidden = ms === null || ms === undefined;
+  if (ms === null || ms === undefined) {
+    return;
+  }
+  setText("#elapsedValue", formatElapsed(ms));
 }
 
 function buildClientPlot(samples, mean, std, scenario, ltl, utl, lsl, usl) {
@@ -506,6 +590,17 @@ function formatRate(value) {
   return Number.isFinite(number) ? `${(number * 100).toFixed(1)}%` : "--";
 }
 
+function formatElapsed(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value)) {
+    return "--";
+  }
+  if (value < 1000) {
+    return `${value.toFixed(0)} ms`;
+  }
+  return `${(value / 1000).toFixed(1)} 秒`;
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -519,4 +614,5 @@ updateHeaderRates();
 updateResultContext();
 updateSpecFields();
 updateMethodPanels();
+updateTwoSidedOptions();
 updateGroupRemoveButtons();

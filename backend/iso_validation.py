@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from math import isfinite
 import re
+import time
 from typing import Iterable
 
 import numpy as np
@@ -91,6 +92,7 @@ def run_iso_validation(
     p_target: float = 0.95,
     conf_target: float = 0.95,
     scenario: str = "two-sided",
+    two_sided_method: str = "fast",
     lsl: float | None = None,
     usl: float | None = None,
     title_label: str = "产品特性",
@@ -124,7 +126,7 @@ def run_iso_validation(
         ltl = mean - k_factor * std if scenario == "lower" else float("-inf")
         utl = mean + k_factor * std if scenario == "upper" else float("inf")
     else:
-        k_factor = two_sided_k_factor(n, p_target, conf_target)
+        k_factor = two_sided_k_factor(n, p_target, conf_target, two_sided_method)
         ltl = mean - k_factor * std
         utl = mean + k_factor * std
 
@@ -157,6 +159,7 @@ def run_pooled_validation(
     p_target: float = 0.95,
     conf_target: float = 0.95,
     scenario: str = "two-sided",
+    two_sided_method: str = "fast",
     lsl: float | None = None,
     usl: float | None = None,
     title_label: str = "产品特性",
@@ -198,7 +201,7 @@ def run_pooled_validation(
             ltl = mean - k_factor * pooled_std if scenario == "lower" else float("-inf")
             utl = mean + k_factor * pooled_std if scenario == "upper" else float("inf")
         else:
-            k_factor = two_sided_k_factor_with_df(n, pooled_df, p_target, conf_target)
+            k_factor = two_sided_k_factor_with_df(n, pooled_df, p_target, conf_target, two_sided_method)
             ltl = mean - k_factor * pooled_std
             utl = mean + k_factor * pooled_std
         passed, reasons = evaluate_specs(scenario, ltl, utl, lsl, usl)
@@ -354,16 +357,42 @@ def distribution_free_confidence(n: int, p_target: float, scenario: str, r: int,
 
 
 @lru_cache(maxsize=512)
-def two_sided_k_factor(n: int, p_target: float, conf_target: float) -> float:
-    return two_sided_k_factor_with_df(n, n - 1, p_target, conf_target)
+def two_sided_k_factor(n: int, p_target: float, conf_target: float, method: str = "fast") -> float:
+    return two_sided_k_factor_with_df(n, n - 1, p_target, conf_target, method)
 
 
 @lru_cache(maxsize=512)
-def two_sided_k_factor_with_df(n: int, df: int, p_target: float, conf_target: float) -> float:
+def two_sided_k_factor_with_df(n: int, df: int, p_target: float, conf_target: float, method: str = "fast") -> float:
+    if method == "exact":
+        return exact_two_sided_k_factor_with_df(n, df, p_target, conf_target)
+    return approximate_two_sided_k_factor_with_df(n, df, p_target, conf_target)
+
+
+def approximate_two_sided_k_factor_with_df(n: int, df: int, p_target: float, conf_target: float) -> float:
+    alpha = 1 - conf_target
+    z_half = norm.ppf((1 + p_target) / 2)
+    chi2_val = chi2.ppf(alpha, df)
+    correction = 1 + (df - chi2_val) / (2 * n * (df + 1))
+    return float(z_half * np.sqrt((1 + 1 / n) * df / chi2_val) * correction)
+
+
+def exact_two_sided_k_factor_with_df(
+    n: int,
+    df: int,
+    p_target: float,
+    conf_target: float,
+    timeout_seconds: float = 30.0,
+) -> float:
+    deadline = time.monotonic() + timeout_seconds
     z_half = float(norm.ppf((1 + p_target) / 2))
+
+    def check_timeout() -> None:
+        if time.monotonic() > deadline:
+            raise ValueError("精确双侧计算耗时过长，已自动停止。请改用快速算法，或降低样本组数后重试。")
 
     def probability(k_factor: float) -> float:
         def integrand(v: float) -> float:
+            check_timeout()
             half_width = k_factor * np.sqrt(v / df)
             if half_width <= z_half:
                 return 0.0
@@ -385,9 +414,10 @@ def two_sided_k_factor_with_df(n: int, df: int, p_target: float, conf_target: fl
     lower = z_half
     upper = max(approximate * 1.25, z_half * 1.25)
     while probability(upper) < conf_target:
+        check_timeout()
         upper *= 1.5
 
-    return float(brentq(lambda k: probability(k) - conf_target, lower, upper, xtol=1e-8, rtol=1e-8))
+    return float(brentq(lambda k: (check_timeout() or probability(k) - conf_target), lower, upper, xtol=1e-8, rtol=1e-8))
 
 
 def evaluate_specs(
