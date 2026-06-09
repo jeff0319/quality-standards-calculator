@@ -209,6 +209,7 @@ def run_pooled_validation(
         rows.append(
             {
                 "label": item["label"],
+                "samples": [float(sample) for sample in item["samples"]],
                 "n": n,
                 "mean": mean,
                 "group_std": item["std"],

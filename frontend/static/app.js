@@ -263,7 +263,7 @@ function renderPooledSelection(data, index) {
   setText("#uslValue", fmtNullable(data.usl));
   setText("#claimLabel", `当前组 ${group.label}`);
   setText("#claimValue", pooledClaimText(group, data.scenario));
-  drawChart(group.plot, data.scenario);
+  drawChart(buildClientPlot(group.samples, group.mean, data.std, data.scenario, group.ltl, group.utl, data.lsl, data.usl), data.scenario);
   updateSelectedGroupRow();
 }
 
@@ -339,6 +339,62 @@ function pooledSpecCells(data) {
 function setStatus(kind, label, text) {
   statusCard.className = `status-card ${kind}`;
   statusCard.innerHTML = `<span>${escapeHtml(label)}</span><strong>${escapeHtml(text)}</strong>`;
+}
+
+function buildClientPlot(samples, mean, std, scenario, ltl, utl, lsl, usl) {
+  const finiteSamples = samples.map(Number).filter(Number.isFinite);
+  const safeStd = Number(std) > 0 ? Number(std) : Math.max(Math.abs(Number(mean)) * 0.01, 1);
+  const bounds = [
+    Number(mean) - 4.5 * safeStd,
+    Number(mean) + 4.5 * safeStd,
+    Math.min(...finiteSamples),
+    Math.max(...finiteSamples),
+  ];
+  if (lsl !== null && lsl !== undefined) {
+    bounds.push(Number(lsl) - safeStd, Number(lsl) + safeStd);
+  }
+  if (usl !== null && usl !== undefined) {
+    bounds.push(Number(usl) - safeStd, Number(usl) + safeStd);
+  }
+  if (ltl !== null && ltl !== undefined) {
+    bounds.push(Number(ltl) - safeStd * 0.4);
+  }
+  if (utl !== null && utl !== undefined) {
+    bounds.push(Number(utl) + safeStd * 0.4);
+  }
+
+  const xMin = Math.min(...bounds);
+  const xMax = Math.max(...bounds);
+  const x = Array.from({ length: 220 }, (_, index) => xMin + ((xMax - xMin) * index) / 219);
+  const y = x.map((value) => normalPdf(value, Number(mean), safeStd));
+  const markers = [{ key: "mean", label: "x\u0304", value: Number(mean), kind: "mean" }];
+  if (ltl !== null && ltl !== undefined) {
+    markers.push({ key: "ltl", label: "LTL", value: Number(ltl), kind: "tolerance" });
+  }
+  if (utl !== null && utl !== undefined) {
+    markers.push({ key: "utl", label: "UTL", value: Number(utl), kind: "tolerance" });
+  }
+  if (lsl !== null && lsl !== undefined && scenario !== "upper") {
+    markers.push({ key: "lsl", label: "LSL", value: Number(lsl), kind: "spec" });
+  }
+  if (usl !== null && usl !== undefined && scenario !== "lower") {
+    markers.push({ key: "usl", label: "USL", value: Number(usl), kind: "spec" });
+  }
+
+  return {
+    x,
+    y,
+    samples: finiteSamples,
+    x_min: xMin,
+    x_max: xMax,
+    y_max: Math.max(...y),
+    markers,
+  };
+}
+
+function normalPdf(value, mean, std) {
+  const z = (value - mean) / std;
+  return Math.exp(-0.5 * z * z) / (std * Math.sqrt(2 * Math.PI));
 }
 
 function drawChart(plot, scenario) {
