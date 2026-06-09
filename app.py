@@ -5,7 +5,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 
-from backend.iso_validation import parse_samples, run_iso_validation
+from backend.iso_validation import parse_samples, run_distribution_free_validation, run_iso_validation, run_pooled_validation
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -30,8 +30,8 @@ def index():
 def validate():
     payload = request.get_json(silent=True) or {}
     try:
-        result = run_iso_validation(
-            data=parse_samples(payload.get("samples", "")),
+        method = payload.get("method", "normal-single")
+        common_args = dict(
             p_target=float(payload.get("p_target", 0.95)),
             conf_target=float(payload.get("conf_target", 0.95)),
             scenario=payload.get("scenario", "two-sided"),
@@ -39,6 +39,21 @@ def validate():
             usl=optional_float(payload.get("usl")),
             title_label=payload.get("title_label") or "产品特性",
         )
+        if method == "normal-pooled":
+            result = run_pooled_validation(groups=payload.get("groups", []), **common_args)
+            return jsonify(result)
+        if method == "distribution-free":
+            result = run_distribution_free_validation(
+                data=parse_samples(payload.get("samples", "")),
+                rank_mode=payload.get("rank_mode", "vw"),
+                v=optional_int(payload.get("v")),
+                w=optional_int(payload.get("w")),
+                r=optional_int(payload.get("r")),
+                s=optional_int(payload.get("s")),
+                **common_args,
+            )
+            return jsonify(result)
+        result = run_iso_validation(data=parse_samples(payload.get("samples", "")), **common_args)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -54,6 +69,12 @@ def optional_float(value):
     if value is None or value == "":
         return None
     return float(value)
+
+
+def optional_int(value):
+    if value is None or value == "":
+        return None
+    return int(value)
 
 
 if __name__ == "__main__":

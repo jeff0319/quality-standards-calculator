@@ -30,11 +30,75 @@
               <input name="title_label" value="关键结构件尺寸" placeholder="例如：关键结构件尺寸" />
             </label>
 
+            <div class="segmented" role="radiogroup" aria-label="计算方法">
+              <label><input type="radio" name="method" value="normal-single" checked /> 正态单组</label>
+              <label><input type="radio" name="method" value="normal-pooled" /> 共同方差</label>
+              <label><input type="radio" name="method" value="distribution-free" /> 自由分布</label>
+            </div>
+
             <label>
               样本数据
               <textarea name="samples" rows="4" spellcheck="false" placeholder="可用逗号或空格分隔，例如：50.1, 48.9, 51.2 或 50.1 48.9 51.2"></textarea>
               <span class="field-note">支持逗号、中文逗号、分号、换行或空格分隔。</span>
             </label>
+
+            <div class="method-panel" data-method-panel="normal-pooled" hidden>
+              <div class="panel-title compact-line">
+                <span>分组样本</span>
+                <button class="subtle-button mini" type="button" id="addGroup">添加组</button>
+              </div>
+              <div id="groupInputs" class="group-inputs">
+                <div class="group-row">
+                  <input name="group_label" value="组 1" aria-label="组名" />
+                  <textarea name="group_samples" rows="2" spellcheck="false" placeholder="组 1 样本">20 18 16 21 19 17 20 16 19 18</textarea>
+                  <button class="subtle-button icon-button remove-group" type="button" aria-label="删除组">×</button>
+                </div>
+                <div class="group-row">
+                  <input name="group_label" value="组 2" aria-label="组名" />
+                  <textarea name="group_samples" rows="2" spellcheck="false" placeholder="组 2 样本">19 14 17 13 10 16 14 12 15 11</textarea>
+                  <button class="subtle-button icon-button remove-group" type="button" aria-label="删除组">×</button>
+                </div>
+                <div class="group-row">
+                  <input name="group_label" value="组 3" aria-label="组名" />
+                  <textarea name="group_samples" rows="2" spellcheck="false" placeholder="组 3 样本">11 12 14 10 8 10 13 9 12 8</textarea>
+                  <button class="subtle-button icon-button remove-group" type="button" aria-label="删除组">×</button>
+                </div>
+                <div class="group-row">
+                  <input name="group_label" value="组 4" aria-label="组名" />
+                  <textarea name="group_samples" rows="2" spellcheck="false" placeholder="组 4 样本">10 7 11 9 6 11 8 12 13 14</textarea>
+                  <button class="subtle-button icon-button remove-group" type="button" aria-label="删除组">×</button>
+                </div>
+              </div>
+              <span class="field-note">每组分别评价，使用合并标准差 s<sub>p</sub>；不会合并均值。</span>
+            </div>
+
+            <div class="method-panel" data-method-panel="distribution-free" hidden>
+              <div class="segmented small" role="radiogroup" aria-label="阶次参数表示">
+                <label><input type="radio" name="rank_mode" value="vw" checked /> ISO v/w</label>
+                <label><input type="radio" name="rank_mode" value="rs" /> 教材 r/s</label>
+              </div>
+              <div class="field-grid rank-fields" data-rank-fields="vw">
+                <label>
+                  v
+                  <input name="v" type="number" min="1" step="1" value="1" />
+                </label>
+                <label>
+                  w
+                  <input name="w" type="number" min="1" step="1" value="1" />
+                </label>
+              </div>
+              <div class="field-grid rank-fields" data-rank-fields="rs" hidden>
+                <label>
+                  r
+                  <input name="r" type="number" min="1" step="1" value="1" />
+                </label>
+                <label>
+                  s
+                  <input name="s" type="number" min="2" step="1" />
+                </label>
+              </div>
+              <span class="field-note">r/s 从左往右数：区间为 X_(r) 到 X_(s)。ISO v/w 表示下端 X_(v)、上端 X_(n-w+1)。</span>
+            </div>
 
             <div class="segmented" role="radiogroup" aria-label="验证类型">
               <label><input type="radio" name="scenario" value="lower" checked /> 下限</label>
@@ -74,7 +138,7 @@
           <div class="summary-grid">
             <article><span>n</span><strong id="nValue">--</strong></article>
             <article><span>x&#772;</span><strong id="meanValue">--</strong></article>
-            <article><span>s</span><strong id="stdValue">--</strong></article>
+            <article><span id="stdLabel">s</span><strong id="stdValue">--</strong></article>
             <article><span>k</span><strong id="kValue">--</strong></article>
             <article class="claim"><span id="claimLabel">宣称值</span><strong id="claimValue">--</strong></article>
           </div>
@@ -99,6 +163,8 @@
             <article><span>LSL</span><strong id="lslValue">--</strong></article>
             <article><span>USL</span><strong id="uslValue">--</strong></article>
           </div>
+
+          <section id="extraResult" class="panel extra-result" hidden></section>
 
           <details class="panel theory-panel">
             <summary>

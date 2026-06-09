@@ -5,6 +5,9 @@ const specFields = {
   lsl: document.querySelector('[data-spec-field="lsl"]'),
   usl: document.querySelector('[data-spec-field="usl"]'),
 };
+const extraResult = document.querySelector("#extraResult");
+let currentResult = null;
+let selectedGroupIndex = 0;
 
 const example = {
   title_label: "关键结构件尺寸",
@@ -16,6 +19,41 @@ const example = {
   lsl: "47.5",
   usl: "",
 };
+
+document.querySelector("#addGroup").addEventListener("click", () => {
+  const groupInputs = document.querySelector("#groupInputs");
+  const index = groupInputs.querySelectorAll(".group-row").length + 1;
+  const row = document.createElement("div");
+  row.className = "group-row";
+  row.innerHTML = `
+    <input name="group_label" value="组 ${index}" aria-label="组名" />
+    <textarea name="group_samples" rows="2" spellcheck="false" placeholder="组 ${index} 样本"></textarea>
+    <button class="subtle-button icon-button remove-group" type="button" aria-label="删除组">×</button>
+  `;
+  groupInputs.append(row);
+  updateGroupRemoveButtons();
+});
+
+document.querySelector("#groupInputs").addEventListener("click", (event) => {
+  const button = event.target.closest(".remove-group");
+  if (!button) {
+    return;
+  }
+  const rows = document.querySelectorAll("#groupInputs .group-row");
+  if (rows.length <= 2) {
+    return;
+  }
+  button.closest(".group-row").remove();
+  updateGroupRemoveButtons();
+});
+
+extraResult.addEventListener("click", (event) => {
+  const row = event.target.closest("[data-group-index]");
+  if (!row || !currentResult || currentResult.method !== "normal-pooled") {
+    return;
+  }
+  renderPooledSelection(currentResult, Number(row.dataset.groupIndex));
+});
 
 document.querySelector("#loadExample").addEventListener("click", () => {
   for (const [key, value] of Object.entries(example)) {
@@ -41,6 +79,14 @@ for (const name of ["p_target", "conf_target"]) {
 }
 
 form.elements.title_label.addEventListener("input", updateResultContext);
+
+for (const item of form.elements.method) {
+  item.addEventListener("change", updateMethodPanels);
+}
+
+for (const item of form.elements.rank_mode) {
+  item.addEventListener("change", updateRankFields);
+}
 
 for (const item of form.elements.scenario) {
   item.addEventListener("change", () => {
@@ -79,7 +125,7 @@ function setSpecField(container, input, visible) {
 }
 
 async function submitForm() {
-  const payload = Object.fromEntries(new FormData(form).entries());
+  const payload = buildPayload();
   setStatus("neutral", "计算中", "正在生成容差边界...");
 
   const response = await fetch("/api/validate", {
@@ -98,6 +144,8 @@ async function submitForm() {
 }
 
 function renderResult(data) {
+  currentResult = data;
+  selectedGroupIndex = 0;
   const state = data.passed === true ? "pass" : data.passed === false ? "fail" : "neutral";
   const title = data.passed === true ? "合格" : data.passed === false ? "不合格" : "已计算";
   setStatus(state, title, data.verdict);
@@ -106,16 +154,186 @@ function renderResult(data) {
 
   setText("#nValue", data.n);
   setText("#meanValue", fmt(data.mean));
+  setText("#stdLabel", data.method === "normal-pooled" ? "sₚ" : "s");
   setText("#stdValue", fmt(data.std));
-  setText("#kValue", fmt(data.k_factor));
-  setText("#ltlValue", fmtNullable(data.ltl));
-  setText("#utlValue", fmtNullable(data.utl));
+  setText("#kValue", fmtNullable(data.k_factor));
+  setText("#ltlValue", fmtBound(data.ltl, "ltl", data.scenario));
+  setText("#utlValue", fmtBound(data.utl, "utl", data.scenario));
   setText("#lslValue", fmtNullable(data.lsl));
   setText("#uslValue", fmtNullable(data.usl));
   setText("#claimLabel", data.claim.label);
   setText("#claimValue", data.claim.text);
 
-  drawChart(data.plot, data.scenario);
+  renderExtraResult(data);
+  if (data.method === "normal-pooled") {
+    renderPooledSelection(data, 0);
+  } else {
+    drawChart(data.plot, data.scenario);
+  }
+}
+
+function buildPayload() {
+  const formData = new FormData(form);
+  const payload = Object.fromEntries(formData.entries());
+  payload.method = formData.get("method") || "normal-single";
+  if (payload.method === "normal-pooled") {
+    const labels = formData.getAll("group_label");
+    const samples = formData.getAll("group_samples");
+    payload.groups = labels.map((label, index) => ({ label, samples: samples[index] || "" })).filter((group) => group.samples.trim());
+  }
+  return payload;
+}
+
+function updateMethodPanels() {
+  const method = new FormData(form).get("method");
+  for (const panel of document.querySelectorAll("[data-method-panel]")) {
+    panel.hidden = panel.dataset.methodPanel !== method;
+  }
+  form.elements.samples.closest("label").hidden = method === "normal-pooled";
+  updateRankFields();
+}
+
+function updateRankFields() {
+  const rankMode = new FormData(form).get("rank_mode");
+  for (const panel of document.querySelectorAll("[data-rank-fields]")) {
+    const visible = panel.dataset.rankFields === rankMode;
+    panel.hidden = !visible;
+    for (const input of panel.querySelectorAll("input")) {
+      input.disabled = !visible;
+    }
+  }
+}
+
+function renderExtraResult(data) {
+  extraResult.hidden = true;
+  extraResult.innerHTML = "";
+  if (data.method === "normal-pooled") {
+    const boundHeaders = pooledBoundHeaders(data.scenario);
+    const specHeaders = pooledSpecHeaders(data.scenario);
+    extraResult.hidden = false;
+    extraResult.innerHTML = `
+      <h3>多组共同方差结果</h3>
+      <div class="rank-summary">
+        <span>组数 ${data.group_count}</span>
+        <span>总样本量 ${data.n}</span>
+        <span>合并自由度 ${data.pooled_df}</span>
+        <span>s<sub>p</sub> ${fmt(data.std)}</span>
+      </div>
+      <table class="result-table">
+        <thead><tr><th>组</th><th>n</th><th>x&#772;</th><th>组内 s</th><th>k</th>${boundHeaders}${specHeaders}<th>结论</th></tr></thead>
+        <tbody>${data.groups
+          .map(
+            (group, index) =>
+              `<tr class="result-row" data-group-index="${index}"><td>${escapeHtml(group.label)}</td><td>${group.n}</td><td>${fmt(group.mean)}</td><td>${fmt(group.group_std)}</td><td>${fmt(group.k_factor)}</td>${pooledBoundCells(group, data.scenario)}${pooledSpecCells(data)}<td>${resultBadge(group.passed, group.verdict)}</td></tr>`
+          )
+          .join("")}</tbody>
+      </table>
+    `;
+  }
+  if (data.method === "distribution-free") {
+    extraResult.hidden = false;
+    extraResult.innerHTML = `
+      <h3>自由分布阶次结果</h3>
+      <div class="rank-summary">
+        <span>v = ${data.v}</span>
+        <span>w = ${data.w}</span>
+        <span>r = ${data.r}</span>
+        <span>s = ${data.s}</span>
+        <span>达到置信度 ${formatRate(data.achieved_conf)}</span>
+      </div>
+    `;
+  }
+}
+
+function renderPooledSelection(data, index) {
+  const group = data.groups[index] || data.groups[0];
+  if (!group) {
+    return;
+  }
+  selectedGroupIndex = data.groups[index] ? index : 0;
+  setText("#chartFeatureName", `${data.title_label} · ${group.label}`);
+  setText("#nValue", group.n);
+  setText("#meanValue", fmt(group.mean));
+  setText("#stdLabel", "sₚ");
+  setText("#stdValue", fmt(data.std));
+  setText("#kValue", fmtNullable(group.k_factor));
+  setText("#ltlValue", fmtBound(group.ltl, "ltl", data.scenario));
+  setText("#utlValue", fmtBound(group.utl, "utl", data.scenario));
+  setText("#lslValue", fmtNullable(data.lsl));
+  setText("#uslValue", fmtNullable(data.usl));
+  setText("#claimLabel", `当前组 ${group.label}`);
+  setText("#claimValue", pooledClaimText(group, data.scenario));
+  drawChart(group.plot, data.scenario);
+  updateSelectedGroupRow();
+}
+
+function updateSelectedGroupRow() {
+  for (const row of extraResult.querySelectorAll("[data-group-index]")) {
+    row.classList.toggle("selected", Number(row.dataset.groupIndex) === selectedGroupIndex);
+  }
+}
+
+function pooledClaimText(group, scenario) {
+  if (scenario === "lower") {
+    return `>= ${fmtBound(group.ltl, "ltl", scenario)}`;
+  }
+  if (scenario === "upper") {
+    return `<= ${fmtBound(group.utl, "utl", scenario)}`;
+  }
+  return `${fmtBound(group.ltl, "ltl", scenario)} ~ ${fmtBound(group.utl, "utl", scenario)}`;
+}
+
+function updateGroupRemoveButtons() {
+  const rows = document.querySelectorAll("#groupInputs .group-row");
+  for (const button of document.querySelectorAll("#groupInputs .remove-group")) {
+    button.disabled = rows.length <= 2;
+  }
+}
+
+function resultBadge(passed, verdict) {
+  const kind = passed === true ? "pass" : passed === false ? "fail" : "neutral";
+  const label = passed === true ? "合格" : passed === false ? "不合格" : "已计算";
+  return `<span class="result-badge ${kind}" title="${escapeHtml(verdict)}">${label}</span>`;
+}
+
+function pooledBoundHeaders(scenario) {
+  if (scenario === "lower") {
+    return "<th>LTL</th>";
+  }
+  if (scenario === "upper") {
+    return "<th>UTL</th>";
+  }
+  return "<th>LTL</th><th>UTL</th>";
+}
+
+function pooledBoundCells(group, scenario) {
+  if (scenario === "lower") {
+    return `<td>${fmtBound(group.ltl, "ltl", scenario)}</td>`;
+  }
+  if (scenario === "upper") {
+    return `<td>${fmtBound(group.utl, "utl", scenario)}</td>`;
+  }
+  return `<td>${fmtBound(group.ltl, "ltl", scenario)}</td><td>${fmtBound(group.utl, "utl", scenario)}</td>`;
+}
+
+function pooledSpecHeaders(scenario) {
+  if (scenario === "lower") {
+    return "<th>LSL</th>";
+  }
+  if (scenario === "upper") {
+    return "<th>USL</th>";
+  }
+  return "<th>LSL</th><th>USL</th>";
+}
+
+function pooledSpecCells(data) {
+  if (data.scenario === "lower") {
+    return `<td>${fmtNullable(data.lsl)}</td>`;
+  }
+  if (data.scenario === "upper") {
+    return `<td>${fmtNullable(data.usl)}</td>`;
+  }
+  return `<td>${fmtNullable(data.lsl)}</td><td>${fmtNullable(data.usl)}</td>`;
 }
 
 function setStatus(kind, label, text) {
@@ -217,6 +435,16 @@ function fmtNullable(value) {
   return value === null || value === undefined ? "未设置" : fmt(value);
 }
 
+function fmtBound(value, kind, scenario) {
+  if (value !== null && value !== undefined) {
+    return fmt(value);
+  }
+  if ((kind === "ltl" && scenario === "upper") || (kind === "utl" && scenario === "lower")) {
+    return "不需计算";
+  }
+  return "未设置";
+}
+
 function formatRate(value) {
   const number = Number(value);
   return Number.isFinite(number) ? `${(number * 100).toFixed(1)}%` : "--";
@@ -234,3 +462,5 @@ function escapeHtml(value) {
 updateHeaderRates();
 updateResultContext();
 updateSpecFields();
+updateMethodPanels();
+updateGroupRemoveButtons();

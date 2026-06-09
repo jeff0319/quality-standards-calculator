@@ -127,6 +127,11 @@ h2 {
   padding: 14px 16px 0;
 }
 
+.panel-title.compact-line {
+  font-size: 13px;
+  font-weight: 760;
+}
+
 label {
   display: grid;
   gap: 6px;
@@ -144,6 +149,27 @@ label {
   font-size: 12px;
   font-weight: 500;
   line-height: 1.35;
+}
+
+.method-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.group-inputs {
+  display: grid;
+  gap: 8px;
+}
+
+.group-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) 32px;
+  gap: 8px;
+  align-items: start;
+}
+
+.group-row textarea {
+  min-height: 58px;
 }
 
 input,
@@ -194,6 +220,10 @@ textarea:focus {
   background: #eef2f7;
 }
 
+.segmented.small {
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .segmented label {
   display: flex;
   min-height: 32px;
@@ -241,6 +271,25 @@ textarea:focus {
   color: #374151;
   border: 1px solid var(--line);
   background: #fff;
+}
+
+.subtle-button.mini {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.icon-button {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
 }
 
 .main-stack {
@@ -417,6 +466,94 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+
+.extra-result {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  box-shadow: none;
+}
+
+.extra-result[hidden] {
+  display: none !important;
+}
+
+.extra-result h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.result-table th,
+.result-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+}
+
+.result-table th {
+  color: var(--muted);
+  font-weight: 760;
+}
+
+.result-row {
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.result-row:hover {
+  background: #f8fafc;
+}
+
+.result-row.selected {
+  background: #eff6ff;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.rank-summary {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #374151;
+  font-size: 13px;
+}
+
+.rank-summary span {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.result-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.result-badge.pass {
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.result-badge.fail {
+  color: var(--bad);
+  background: var(--bad-bg);
+}
+
+.result-badge.neutral {
+  color: #374151;
+  background: #f3f4f6;
 }
 
 .theory-panel {
