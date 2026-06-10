@@ -488,8 +488,9 @@ function drawChart(plot, scenario) {
   const pad = { left: 52, right: 24, top: 18, bottom: 48 };
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
-  const xMin = plot.x_min;
-  const xMax = plot.x_max;
+  const xAxis = niceAxis(plot.x_min, plot.x_max, 6);
+  const xMin = xAxis.min;
+  const xMax = xAxis.max;
   const yMax = plot.y_max * 1.14;
   const xScale = (x) => pad.left + ((x - xMin) / (xMax - xMin)) * innerW;
   const yScale = (y) => pad.top + innerH - (y / yMax) * innerH;
@@ -502,7 +503,7 @@ function drawChart(plot, scenario) {
     `${xScale(plot.x.at(-1)).toFixed(2)},${yScale(0).toFixed(2)}`,
   ].join(" ");
 
-  const ticks = Array.from({ length: 6 }, (_, index) => xMin + ((xMax - xMin) * index) / 5);
+  const ticks = xAxis.ticks;
   const grid = ticks
     .map((tick) => {
       const x = xScale(tick);
@@ -536,7 +537,7 @@ function drawChart(plot, scenario) {
       const x = xScale(tick);
       return `
         <line class="axis" x1="${x}" y1="${pad.top + innerH}" x2="${x}" y2="${pad.top + innerH + 5}" />
-        <text class="tick-label" x="${x}" y="${height - 15}" text-anchor="middle">${fmt(tick)}</text>
+        <text class="tick-label" x="${x}" y="${height - 15}" text-anchor="middle">${formatTick(tick, xAxis.decimals)}</text>
       `;
     })
     .join("");
@@ -566,6 +567,59 @@ function scenarioLabel(scenario) {
 
 function setText(selector, value) {
   document.querySelector(selector).textContent = value;
+}
+
+function niceAxis(min, max, targetTicks) {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+    const center = Number.isFinite(min) ? min : 0;
+    min = center - 1;
+    max = center + 1;
+  }
+  const span = niceNumber(max - min, false);
+  const step = niceNumber(span / Math.max(targetTicks - 1, 1), true);
+  const niceMin = Math.floor(min / step) * step;
+  const niceMax = Math.ceil(max / step) * step;
+  const decimals = Math.max(0, -Math.floor(Math.log10(step)));
+  const ticks = [];
+  for (let value = niceMin; value <= niceMax + step * 0.5; value += step) {
+    ticks.push(roundToDecimals(value, decimals));
+  }
+  return { min: niceMin, max: niceMax, ticks, decimals };
+}
+
+function niceNumber(value, round) {
+  const exponent = Math.floor(Math.log10(value));
+  const fraction = value / 10 ** exponent;
+  let niceFraction;
+  if (round) {
+    if (fraction < 1.5) {
+      niceFraction = 1;
+    } else if (fraction < 3) {
+      niceFraction = 2;
+    } else if (fraction < 7) {
+      niceFraction = 5;
+    } else {
+      niceFraction = 10;
+    }
+  } else if (fraction <= 1) {
+    niceFraction = 1;
+  } else if (fraction <= 2) {
+    niceFraction = 2;
+  } else if (fraction <= 5) {
+    niceFraction = 5;
+  } else {
+    niceFraction = 10;
+  }
+  return niceFraction * 10 ** exponent;
+}
+
+function roundToDecimals(value, decimals) {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+function formatTick(value, decimals) {
+  return Number(value).toFixed(decimals);
 }
 
 function fmt(value) {
