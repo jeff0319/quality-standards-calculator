@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IEC 60704-3 噪声宣称值与 OC 曲线</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="layout">
+        <div class="left-stack">
+          <header class="topbar">
+            <img class="brand-icon" src="/static/favicon.svg" alt="" aria-hidden="true" />
+            <div>
+              <p class="kicker">IEC 60704-3</p>
+              <h1>噪声宣称值与 OC 曲线</h1>
+            </div>
+          </header>
+          <a class="home-link" href="/">返回标准入口</a>
+
+          <form id="iecForm" class="panel controls">
+            <div class="panel-title">
+              <h2>输入</h2>
+              <button class="subtle-button" type="button" id="loadIecExample">示例</button>
+            </div>
+
+            <label>
+              特性名称
+              <input name="title_label" value="A 计权声功率级" placeholder="例如：A 计权声功率级" />
+            </label>
+
+            <div class="segmented small" role="radiogroup" aria-label="IEC 计算页面">
+              <label><input type="radio" name="tool_mode" value="declaration" checked /> 宣称值计算</label>
+              <label><input type="radio" name="tool_mode" value="inspection" /> 抽检验证</label>
+            </div>
+
+            <div class="field-grid">
+              <label>
+                样本量 n
+                <input name="n" type="number" min="1" step="1" value="3" />
+              </label>
+              <label>
+                <span class="math-nowrap">质量水平 p<sub>1-α</sub> (%)</span>
+                <input name="p" type="number" min="0.01" max="50" step="any" value="6.5" />
+              </label>
+              <label>
+                接收概率 Pa (%)
+                <input name="pa" type="number" min="50" max="99.99" step="any" value="95" />
+              </label>
+              <label>
+                <span class="math-nowrap">σ<sub>M</sub></span>
+                <input name="sigma_m" type="number" min="0" step="any" value="1.5" />
+              </label>
+              <label>
+                <span class="math-nowrap">σ<sub>R</sub></span>
+                <input name="sigma_r" type="number" min="0" step="any" value="0.8" />
+              </label>
+            </div>
+
+            <div class="method-panel split-panel" data-tool-panel="declaration">
+              <div class="panel-title compact-line"><span>宣称值设计</span></div>
+              <label>
+                设计样本数据
+                <textarea name="declaration_samples" rows="4" spellcheck="false" placeholder="例如：75.2, 75.5, 75.9">75.2, 75.5, 75.9, 76.1, 76.2, 76.3, 76.3, 76.6, 76.8</textarea>
+                <span class="field-note">用于估计宣称值设计时的均值和样本标准差 s。</span>
+              </label>
+            </div>
+
+            <div class="method-panel split-panel" data-tool-panel="inspection" hidden>
+              <div class="panel-title compact-line"><span>抽检验证 / OC</span></div>
+              <label>
+                抽检样本数据
+                <textarea name="inspection_samples" rows="3" spellcheck="false" placeholder="例如：75.5, 74.5, 76.1"></textarea>
+              </label>
+              <div class="field-grid">
+                <label>
+                  <span class="math-nowrap">现有宣称值 L<sub>c</sub></span>
+                  <input name="declared_value" type="number" step="any" placeholder="填入后进行抽检判断" />
+                </label>
+              </div>
+            </div>
+
+            <div class="action-row">
+              <button class="primary-button" type="submit" id="iecSubmitButton">
+                <span id="iecSubmitLabel">计算</span>
+                <small id="iecElapsedValue" hidden>--</small>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <section class="main-stack">
+          <div id="iecStatusCard" class="status-card neutral">
+            <span>等待计算</span>
+            <strong>输入噪声测试结果后生成宣称值与 OC 曲线</strong>
+          </div>
+
+          <div class="summary-grid iec-summary-grid">
+            <article><span>n</span><strong id="iecNValue">--</strong></article>
+            <article><span>x&#772;</span><strong id="iecMeanValue">--</strong></article>
+            <article><span>s</span><strong id="iecSampleStdValue">--</strong></article>
+            <article><span class="math-nowrap">σ<sub>M</sub></span><strong id="iecSigmaMValue">--</strong></article>
+            <article><span class="math-nowrap">σ<sub>R</sub></span><strong id="iecSigmaRValue">--</strong></article>
+            <article><span class="math-nowrap">σ<sub>t</sub></span><strong id="iecSigmaTValue">--</strong></article>
+            <article><span>k</span><strong id="iecKValue">--</strong></article>
+            <article><span>K</span><strong id="iecMarginValue">--</strong></article>
+            <article class="claim"><span id="iecClaimLabel">推荐宣称值 L<sub>c</sub></span><strong id="iecClaimValue">--</strong></article>
+          </div>
+
+          <section class="panel chart-panel">
+            <div class="panel-title compact">
+              <h2><span id="iecChartFeatureName">A 计权声功率级</span>：OC 曲线</h2>
+              <div class="chart-head-meta">
+                <div class="chart-meta-row">
+                  <span><span class="math-nowrap">p<sub>1-α</sub></span> <strong id="iecHeroP">6.5%</strong></span>
+                  <span>Pa <strong id="iecHeroPa">95.0%</strong></span>
+                  <span class="legend-item oc-coverage">OC 曲线</span>
+                </div>
+                <div class="chart-meta-row">
+                  <span class="legend-item oc-boundary" id="iecBoundaryLegend">6.5% / 95.0%</span>
+                  <span class="legend-item oc-declared" id="iecDeclaredLegend">当前 Lc</span>
+                </div>
+              </div>
+            </div>
+            <svg id="iecOcChart" viewBox="0 0 900 390" role="img" aria-label="IEC 60704-3 质量水平与接收概率 OC 曲线"></svg>
+          </section>
+
+          <section id="iecDeclarationTablePanel" class="panel extra-result">
+            <h3>不同 p<sub>1-α</sub> 与 Pa 下的宣称值</h3>
+            <div id="iecDeclarationTable"></div>
+          </section>
+
+          <div class="bounds-grid iec-bounds-grid">
+            <article><span>抽检 x&#772;</span><strong id="iecInspectionMeanValue">--</strong></article>
+            <article><span>接受限 <span class="math-nowrap">L<sub>c</sub> - kσ<sub>M</sub></span></span><strong id="iecAcceptanceLimitValue">--</strong></article>
+            <article><span>当前 <span class="math-nowrap">L<sub>c</sub></span> 质量水平</span><strong id="iecDeclaredCoverageValue">--</strong></article>
+            <article><span>当前 <span class="math-nowrap">L<sub>c</sub></span> 接受概率</span><strong id="iecDeclaredPaValue">--</strong></article>
+          </div>
+
+          <section class="panel extra-result">
+            <h3>计算式</h3>
+            <div class="rank-summary">
+              <span id="iecFormulaK">k = --</span>
+              <span id="iecFormulaSigmaT">σt = --</span>
+              <span id="iecFormulaLc">Lc = --</span>
+              <span id="iecFormulaOc">Pa(p) = --</span>
+            </div>
+          </section>
+
+          <details class="panel theory-panel">
+            <summary>
+              <span>理论依据</span>
+              <strong>IEC 60704-3 计量抽样 OC 规则</strong>
+            </summary>
+            <div class="theory-content">
+              <section class="theory-section">
+                <h3>抽样接受规则</h3>
+                <p>在正态且采用参考标准差 <span class="math-nowrap">σ<sub>M</sub></span> 的计量抽样中，给定宣称值 <span class="math-nowrap">L<sub>c</sub></span> 后，接受条件为：</p>
+                <div class="equation">x&#772; ≤ <span class="math-nowrap">L<sub>c</sub></span> - <span class="math-nowrap">kσ<sub>M</sub></span></div>
+                <p>其中 k 由质量水平 <span class="math-nowrap">p<sub>1-α</sub></span>、接收概率 Pa 和验证样本量 n 决定；<span class="math-nowrap">p<sub>1-α</sub></span> 表示超差比例。</p>
+                <div class="equation">k = Φ<sup>-1</sup>(1 - p<sub>1-α</sub>) - Φ<sup>-1</sup>(Pa) / √n</div>
+              </section>
+              <section class="theory-section">
+                <h3>OC 曲线</h3>
+                <p>若真实总体中超过宣称值的比例为 p，则该抽样规则的接收概率为：</p>
+                <div class="equation">Pa(p) = Φ(√n · (Φ<sup>-1</sup>(1 - p) - k))</div>
+              </section>
+              <section class="theory-section">
+                <h3>反向宣称值</h3>
+                <p>由测试均值反向设计宣称值时，本页面采用：</p>
+                <div class="equation"><span class="math-nowrap">σ<sub>t</sub></span> = √(s<sup>2</sup> + <span class="math-nowrap">σ<sub>R</sub><sup>2</sup></span>)</div>
+                <div class="equation"><span class="math-nowrap">L<sub>c</sub></span> = x&#772; + <span class="math-nowrap">kσ<sub>M</sub></span> + Φ<sup>-1</sup>(Pa)<span class="math-nowrap">σ<sub>t</sub></span> / √n</div>
+              </section>
+            </div>
+          </details>
+        </section>
+      </section>
+    </main>
+    <script src="/static/iec60704.js"></script>
+  </body>
+</html>

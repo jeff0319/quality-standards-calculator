@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 from math import isfinite
-import re
 import time
 from typing import Iterable
 
@@ -11,6 +10,8 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.optimize import brentq
 from scipy.stats import beta, chi2, nct, norm
+
+from backend.parsing import parse_samples
 
 
 VALID_SCENARIOS = {"two-sided", "lower", "upper"}
@@ -23,6 +24,8 @@ class ValidationResult:
     n: int
     mean: float
     std: float
+    production_std: float
+    reproducibility_std: float
     p_target: float
     conf_target: float
     k_factor: float
@@ -43,6 +46,8 @@ class ValidationResult:
             "n": self.n,
             "mean": self.mean,
             "std": self.std,
+            "production_std": self.production_std,
+            "reproducibility_std": self.reproducibility_std,
             "p_target": self.p_target,
             "conf_target": self.conf_target,
             "k_factor": self.k_factor,
@@ -56,22 +61,6 @@ class ValidationResult:
             "claim": self.claim,
             "plot": self.plot,
         }
-
-
-def parse_samples(raw: str | Iterable[float]) -> list[float]:
-    if isinstance(raw, str):
-        values = [item for item in re.split(r"[\s,，;；]+", raw.strip()) if item]
-        if not values:
-            raise ValueError("请输入样本数据。")
-        try:
-            return [float(item) for item in values]
-        except ValueError as exc:
-            raise ValueError("样本数据中存在无法识别的数字。") from exc
-
-    try:
-        return [float(item) for item in raw]
-    except (TypeError, ValueError) as exc:
-        raise ValueError("样本数据格式不正确。") from exc
 
 
 def parse_groups(raw_groups: Iterable[dict[str, object]]) -> list[dict[str, object]]:
@@ -93,6 +82,7 @@ def run_iso_validation(
     conf_target: float = 0.95,
     scenario: str = "two-sided",
     two_sided_method: str = "fast",
+    reproducibility_std: float = 0.0,
     lsl: float | None = None,
     usl: float | None = None,
     title_label: str = "产品特性",
@@ -110,6 +100,8 @@ def run_iso_validation(
         raise ValueError("置信度 confidence 必须在 0 和 1 之间。")
     if lsl is not None and usl is not None and lsl >= usl:
         raise ValueError("LSL 必须小于 USL。")
+    if not isfinite(reproducibility_std) or reproducibility_std < 0:
+        raise ValueError("再现性标准差必须为有限且不小于 0 的数。")
 
     n = len(samples)
     df = n - 1
@@ -117,18 +109,19 @@ def run_iso_validation(
     std = float(np.std(samples, ddof=1))
     if std <= 0:
         raise ValueError("样本标准差必须大于 0，请确认样本不是全部相同。")
+    total_std = combine_std(std, reproducibility_std)
 
     alpha = 1 - conf_target
     if scenario in {"lower", "upper"}:
         z_p = norm.ppf(p_target)
         nc = z_p * np.sqrt(n)
         k_factor = float(nct.ppf(conf_target, df, nc) / np.sqrt(n))
-        ltl = mean - k_factor * std if scenario == "lower" else float("-inf")
-        utl = mean + k_factor * std if scenario == "upper" else float("inf")
+        ltl = mean - k_factor * total_std if scenario == "lower" else float("-inf")
+        utl = mean + k_factor * total_std if scenario == "upper" else float("inf")
     else:
         k_factor = two_sided_k_factor(n, p_target, conf_target, two_sided_method)
-        ltl = mean - k_factor * std
-        utl = mean + k_factor * std
+        ltl = mean - k_factor * total_std
+        utl = mean + k_factor * total_std
 
     passed, reasons = evaluate_specs(scenario, ltl, utl, lsl, usl)
     verdict = build_verdict(passed, reasons)
@@ -138,7 +131,9 @@ def run_iso_validation(
         scenario=scenario,
         n=n,
         mean=mean,
-        std=std,
+        std=total_std,
+        production_std=std,
+        reproducibility_std=reproducibility_std,
         p_target=p_target,
         conf_target=conf_target,
         k_factor=k_factor,
@@ -150,7 +145,7 @@ def run_iso_validation(
         verdict=verdict,
         reasons=reasons,
         claim=build_claim(scenario, ltl, utl),
-        plot=build_plot(samples, mean, std, scenario, ltl, utl, lsl, usl),
+        plot=build_plot(samples, mean, total_std, scenario, ltl, utl, lsl, usl),
     )
 
 
@@ -160,6 +155,7 @@ def run_pooled_validation(
     conf_target: float = 0.95,
     scenario: str = "two-sided",
     two_sided_method: str = "fast",
+    reproducibility_std: float = 0.0,
     lsl: float | None = None,
     usl: float | None = None,
     title_label: str = "产品特性",
@@ -169,6 +165,8 @@ def run_pooled_validation(
         raise ValueError("scenario 必须为 two-sided、lower 或 upper。")
     if not 0 < p_target < 1 or not 0 < conf_target < 1:
         raise ValueError("覆盖率和置信度必须在 0 和 1 之间。")
+    if not isfinite(reproducibility_std) or reproducibility_std < 0:
+        raise ValueError("再现性标准差必须为有限且不小于 0 的数。")
 
     group_stats = []
     pooled_ss = 0.0
@@ -187,6 +185,7 @@ def run_pooled_validation(
         group_stats.append({"label": group["label"], "samples": samples, "n": n, "mean": mean, "std": std})
 
     pooled_std = float(np.sqrt(pooled_ss / pooled_df))
+    total_std = combine_std(pooled_std, reproducibility_std)
     rows = []
     first_ltl = float("-inf")
     first_utl = float("inf")
@@ -198,12 +197,12 @@ def run_pooled_validation(
             z_p = norm.ppf(p_target)
             nc = z_p * np.sqrt(n)
             k_factor = float(nct.ppf(conf_target, pooled_df, nc) / np.sqrt(n))
-            ltl = mean - k_factor * pooled_std if scenario == "lower" else float("-inf")
-            utl = mean + k_factor * pooled_std if scenario == "upper" else float("inf")
+            ltl = mean - k_factor * total_std if scenario == "lower" else float("-inf")
+            utl = mean + k_factor * total_std if scenario == "upper" else float("inf")
         else:
             k_factor = two_sided_k_factor_with_df(n, pooled_df, p_target, conf_target, two_sided_method)
-            ltl = mean - k_factor * pooled_std
-            utl = mean + k_factor * pooled_std
+            ltl = mean - k_factor * total_std
+            utl = mean + k_factor * total_std
         passed, reasons = evaluate_specs(scenario, ltl, utl, lsl, usl)
         if first_k is None:
             first_k = k_factor
@@ -221,7 +220,7 @@ def run_pooled_validation(
                 "utl": finite_or_none(utl),
                 "passed": passed,
                 "verdict": build_verdict(passed, reasons),
-                "plot": build_plot(item["samples"], mean, pooled_std, scenario, ltl, utl, lsl, usl),
+                "plot": build_plot(item["samples"], mean, total_std, scenario, ltl, utl, lsl, usl),
             }
         )
 
@@ -244,7 +243,9 @@ def run_pooled_validation(
         "group_count": len(group_stats),
         "pooled_df": pooled_df,
         "mean": float(np.mean([item["mean"] for item in group_stats])),
-        "std": pooled_std,
+        "std": total_std,
+        "production_std": pooled_std,
+        "reproducibility_std": reproducibility_std,
         "p_target": p_target,
         "conf_target": conf_target,
         "k_factor": first_k,
@@ -356,6 +357,10 @@ def distribution_free_confidence(n: int, p_target: float, scenario: str, r: int,
     return float(1 - beta.cdf(p_target, s - r, n - s + r + 1))
 
 
+def combine_std(production_std: float, reproducibility_std: float) -> float:
+    return float(np.sqrt(production_std * production_std + reproducibility_std * reproducibility_std))
+
+
 @lru_cache(maxsize=512)
 def two_sided_k_factor(n: int, p_target: float, conf_target: float, method: str = "fast") -> float:
     return two_sided_k_factor_with_df(n, n - 1, p_target, conf_target, method)
@@ -456,12 +461,12 @@ def append_sentence(base: str, sentence: str) -> str:
 
 def build_claim(scenario: str, ltl: float, utl: float) -> dict[str, float | str | None]:
     if scenario == "lower":
-        return {"type": "minimum", "label": "建议最低宣称值", "value": ltl, "text": f">= {ltl:.3f}"}
+        return {"type": "minimum", "label": "可宣称下限", "value": ltl, "text": f">= {ltl:.3f}"}
     if scenario == "upper":
-        return {"type": "maximum", "label": "建议最高宣称值", "value": utl, "text": f"<= {utl:.3f}"}
+        return {"type": "maximum", "label": "可宣称上限", "value": utl, "text": f"<= {utl:.3f}"}
     return {
         "type": "range",
-        "label": "建议双侧宣称范围",
+        "label": "可宣称范围",
         "lower": ltl,
         "upper": utl,
         "text": f"{ltl:.3f} ~ {utl:.3f}",

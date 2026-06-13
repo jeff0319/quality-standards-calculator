@@ -1,5 +1,5 @@
 services:
-  iso-web:
+  standards-web:
     build: .
     environment:
       PORT: "8018"

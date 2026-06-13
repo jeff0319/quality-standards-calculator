@@ -5,6 +5,7 @@ const specFields = {
   lsl: document.querySelector('[data-spec-field="lsl"]'),
   usl: document.querySelector('[data-spec-field="usl"]'),
 };
+const reproducibilityField = document.querySelector("[data-repro-field]");
 const extraResult = document.querySelector("#extraResult");
 const submitButton = document.querySelector("#submitButton");
 const submitLabel = document.querySelector("#submitLabel");
@@ -17,6 +18,7 @@ let activeStartedAt = 0;
 let elapsedTimer = null;
 
 const example = {
+  method: "normal-single",
   title_label: "关键结构件尺寸",
   samples:
     "50.1, 48.9, 51.2, 49.5, 50.6, 52.1, 48.5, 50.0, 49.8, 51.0,\n50.5, 49.2, 51.8, 50.1, 49.9, 51.1, 48.8, 50.3, 49.6, 50.8",
@@ -72,12 +74,15 @@ document.querySelector("#loadExample").addEventListener("click", () => {
   for (const [key, value] of Object.entries(example)) {
     if (key === "scenario") {
       form.querySelector(`input[name="scenario"][value="${value}"]`).checked = true;
+    } else if (key === "method") {
+      form.querySelector(`input[name="method"][value="${value}"]`).checked = true;
     } else {
       form.elements[key].value = value;
     }
   }
   updateHeaderRates();
   updateResultContext();
+  updateMethodPanels();
   updateSpecFields();
   updateTwoSidedOptions();
   submitForm();
@@ -96,7 +101,9 @@ form.elements.title_label.addEventListener("input", updateResultContext);
 
 for (const item of form.elements.method) {
   item.addEventListener("change", () => {
+    clearSpecInputs();
     updateMethodPanels();
+    updateSpecFields();
     updateTwoSidedOptions();
   });
 }
@@ -142,6 +149,11 @@ function setSpecField(container, input, visible) {
   }
 }
 
+function clearSpecInputs() {
+  form.elements.lsl.value = "";
+  form.elements.usl.value = "";
+}
+
 async function submitForm() {
   if (activeController) {
     activeController.abort();
@@ -156,7 +168,7 @@ async function submitForm() {
   setStatus("neutral", exactMode ? "精确计算中" : "计算中", exactMode ? "正在执行双侧数值积分，可点击停止取消等待..." : "正在生成容差边界...");
 
   try {
-    const response = await fetch("/api/validate", {
+    const response = await fetch("/api/iso-16269-6", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -198,7 +210,9 @@ function renderResult(data) {
 
   setText("#nValue", data.n);
   setText("#meanValue", fmt(data.mean));
-  setText("#stdLabel", data.method === "normal-pooled" ? "sₚ" : "s");
+  setProductionStdLabel(data);
+  setText("#productionStdValue", fmt(productionStd(data)));
+  setText("#reproStdValue", fmt(reproducibilityStd(data)));
   setText("#stdValue", fmt(data.std));
   setText("#kValue", fmtNullable(data.k_factor));
   setText("#ltlValue", fmtBound(data.ltl, "ltl", data.scenario));
@@ -256,7 +270,16 @@ function updateMethodPanels() {
     panel.hidden = panel.dataset.methodPanel !== method;
   }
   form.elements.samples.closest("label").hidden = method === "normal-pooled";
+  setReproducibilityField(method !== "distribution-free");
   updateRankFields();
+}
+
+function setReproducibilityField(visible) {
+  reproducibilityField.hidden = !visible;
+  form.elements.reproducibility_std.disabled = !visible;
+  if (!visible) {
+    form.elements.reproducibility_std.value = "";
+  }
 }
 
 function updateTwoSidedOptions() {
@@ -293,7 +316,9 @@ function renderExtraResult(data) {
         <span>组数 ${data.group_count}</span>
         <span>总样本量 ${data.n}</span>
         <span>合并自由度 ${data.pooled_df}</span>
-        <span>s<sub>p</sub> ${fmt(data.std)}</span>
+        <span>σ<sub>p</sub> ${fmt(data.production_std)}</span>
+        <span>σ<sub>R</sub> ${fmt(data.reproducibility_std)}</span>
+        <span>σ<sub>total</sub> ${fmt(data.std)}</span>
       </div>
       <table class="result-table">
         <thead><tr><th>组</th><th>n</th><th>x&#772;</th><th>组内 s</th><th>k</th>${boundHeaders}${specHeaders}<th>结论</th></tr></thead>
@@ -330,7 +355,9 @@ function renderPooledSelection(data, index) {
   setText("#chartFeatureName", `${data.title_label} · ${group.label}`);
   setText("#nValue", group.n);
   setText("#meanValue", fmt(group.mean));
-  setText("#stdLabel", "sₚ");
+  setProductionStdLabel(data);
+  setText("#productionStdValue", fmt(productionStd(data)));
+  setText("#reproStdValue", fmt(reproducibilityStd(data)));
   setText("#stdValue", fmt(data.std));
   setText("#kValue", fmtNullable(group.k_factor));
   setText("#ltlValue", fmtBound(group.ltl, "ltl", data.scenario));
@@ -357,6 +384,18 @@ function pooledClaimText(group, scenario) {
     return `<= ${fmtBound(group.utl, "utl", scenario)}`;
   }
   return `${fmtBound(group.ltl, "ltl", scenario)} ~ ${fmtBound(group.utl, "utl", scenario)}`;
+}
+
+function productionStd(data) {
+  return data.production_std ?? data.std;
+}
+
+function reproducibilityStd(data) {
+  return data.reproducibility_std ?? 0;
+}
+
+function setProductionStdLabel(data) {
+  document.querySelector("#productionStdLabel").innerHTML = "σ<sub>p</sub>";
 }
 
 function updateGroupRemoveButtons() {
