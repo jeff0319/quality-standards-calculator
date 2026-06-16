@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <main class="shell">
+    <main class="shell app-shell">
       <section class="layout">
         <div class="left-stack">
           <header class="topbar">
@@ -38,7 +38,7 @@
 
             <div class="field-grid">
               <label>
-                样本量 n
+                验证样本量 n
                 <input name="n" type="number" min="1" step="1" value="3" />
               </label>
               <label>
@@ -105,7 +105,7 @@
             <article><span class="math-nowrap">σ<sub>R</sub></span><strong id="iecSigmaRValue">--</strong></article>
             <article><span class="math-nowrap">σ<sub>t</sub></span><strong id="iecSigmaTValue">--</strong></article>
             <article><span>k</span><strong id="iecKValue">--</strong></article>
-            <article><span>K</span><strong id="iecMarginValue">--</strong></article>
+            <article id="iecMarginCard"><span>ΔL</span><strong id="iecMarginValue">--</strong></article>
             <article class="claim"><span id="iecClaimLabel">推荐宣称值 L<sub>c</sub></span><strong id="iecClaimValue">--</strong></article>
           </div>
 
@@ -144,40 +144,69 @@
             <div class="rank-summary">
               <span id="iecFormulaK">k = --</span>
               <span id="iecFormulaSigmaT">σt = --</span>
+              <span id="iecFormulaKPrime">k' = --</span>
+              <span id="iecFormulaMargin">ΔL = --</span>
               <span id="iecFormulaLc">Lc = --</span>
               <span id="iecFormulaOc">Pa(p) = --</span>
             </div>
           </section>
 
-          <details class="panel theory-panel">
+          <details class="panel theory-panel" data-tool-panel="declaration">
             <summary>
               <span>理论依据</span>
-              <strong>IEC 60704-3 计量抽样 OC 规则</strong>
+              <strong>IEC 60704-3 宣称值计算</strong>
+            </summary>
+            <div class="theory-content">
+              <section class="theory-section">
+                <h3>未来验证规则中的 k</h3>
+                <p>宣称值设计需要先确定未来验证方案中的小 k。它由质量水平 <span class="math-nowrap">p<sub>1-α</sub></span>、目标接收概率 Pa 和验证样本量 n 决定：</p>
+                <div class="equation">\[k = \Phi^{-1}(1 - p_{1-\alpha}) - \frac{\Phi^{-1}(P_a)}{\sqrt{n}}\]</div>
+              </section>
+              <section class="theory-section">
+                <h3>反向宣称值</h3>
+                <p>由测试均值反向设计宣称值时，本页面采用：</p>
+                <div class="equation">\[\sigma_t = \sqrt{s^2 + \sigma_R^2}\]</div>
+                <div class="equation">\[k' = \frac{\Phi^{-1}(P_a)}{\sqrt{n}}\]</div>
+                <div class="equation">\[\Delta L = k\sigma_M + k'\sigma_t\]</div>
+                <div class="equation">\[L_c = \bar{x} + \Delta L\]</div>
+                <p><span class="math-nowrap">ΔL</span> 是带单位的声明裕量，不是无量纲系数。<span class="math-nowrap">kσ<sub>M</sub></span> 对应未来抽检接受规则中的扣减量；<span class="math-nowrap">k'σ<sub>t</sub></span> 对应未来抽检均值波动下达到目标接收概率 Pa 所需的额外裕量。这里的 n 是未来验证/抽检方案的样本量；若标准抽检固定为 n = 3，则这里也应使用 3，而不是设计样本数据的个数。</p>
+              </section>
+            </div>
+          </details>
+
+          <details class="panel theory-panel" data-tool-panel="inspection" hidden>
+            <summary>
+              <span>理论依据</span>
+              <strong>IEC 60704-3 抽检验证与 OC 曲线</strong>
             </summary>
             <div class="theory-content">
               <section class="theory-section">
                 <h3>抽样接受规则</h3>
                 <p>在正态且采用参考标准差 <span class="math-nowrap">σ<sub>M</sub></span> 的计量抽样中，给定宣称值 <span class="math-nowrap">L<sub>c</sub></span> 后，接受条件为：</p>
-                <div class="equation">x&#772; ≤ <span class="math-nowrap">L<sub>c</sub></span> - <span class="math-nowrap">kσ<sub>M</sub></span></div>
+                <div class="equation">\[\bar{x} \le L_c - k\sigma_M\]</div>
                 <p>其中 k 由质量水平 <span class="math-nowrap">p<sub>1-α</sub></span>、接收概率 Pa 和验证样本量 n 决定；<span class="math-nowrap">p<sub>1-α</sub></span> 表示超差比例。</p>
-                <div class="equation">k = Φ<sup>-1</sup>(1 - p<sub>1-α</sub>) - Φ<sup>-1</sup>(Pa) / √n</div>
+                <div class="equation">\[k = \Phi^{-1}(1 - p_{1-\alpha}) - \frac{\Phi^{-1}(P_a)}{\sqrt{n}}\]</div>
               </section>
               <section class="theory-section">
                 <h3>OC 曲线</h3>
                 <p>若真实总体中超过宣称值的比例为 p，则该抽样规则的接收概率为：</p>
-                <div class="equation">Pa(p) = Φ(√n · (Φ<sup>-1</sup>(1 - p) - k))</div>
-              </section>
-              <section class="theory-section">
-                <h3>反向宣称值</h3>
-                <p>由测试均值反向设计宣称值时，本页面采用：</p>
-                <div class="equation"><span class="math-nowrap">σ<sub>t</sub></span> = √(s<sup>2</sup> + <span class="math-nowrap">σ<sub>R</sub><sup>2</sup></span>)</div>
-                <div class="equation"><span class="math-nowrap">L<sub>c</sub></span> = x&#772; + <span class="math-nowrap">kσ<sub>M</sub></span> + Φ<sup>-1</sup>(Pa)<span class="math-nowrap">σ<sub>t</sub></span> / √n</div>
+                <div class="equation">\[P_a(p) = \Phi\left(\sqrt{n}\left(\Phi^{-1}(1 - p) - k\right)\right)\]</div>
               </section>
             </div>
           </details>
         </section>
       </section>
     </main>
-    <script src="/static/iec60704.js"></script>
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [["\\(", "\\)"]],
+          displayMath: [["\\[", "\\]"]],
+        },
+        chtml: { scale: 0.95 },
+      };
+    </script>
+    <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+    <script defer src="/static/iec60704.js"></script>
   </body>
 </html>

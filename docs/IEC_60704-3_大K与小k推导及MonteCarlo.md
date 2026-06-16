@@ -493,22 +493,34 @@ L_c
 \mu+k\sigma_M+\frac{z_{P_a}}{\sqrt n}\sigma_t
 ```
 
-若写成
+若把声明值写成测试均值加一个带单位的声明裕量：
 
 ```math
-L_c=\mu+K
+L_c=\mu+\Delta L
 ```
 
 则声明裕量为
 
 ```math
-K=k\sigma_M+\frac{z_{P_a}}{\sqrt n}\sigma_t
+\Delta L=k\sigma_M+\frac{z_{P_a}}{\sqrt n}\sigma_t
 ```
 
-这说明大 `K` 是为通过未来抽检而设置的声明裕量，小 `k` 是抽检接受规则中的扣减量。二者相关，但处在不同位置：
+也可将第二项中的无量纲系数单独记为
 
 ```math
-\text{声明：}\quad L_c=\mu+K
+k'=\frac{z_{P_a}}{\sqrt n}
+```
+
+于是
+
+```math
+\Delta L=k\sigma_M+k'\sigma_t
+```
+
+这说明 `\Delta L` 是为通过未来抽检而设置的带单位声明裕量，小 `k` 是抽检接受规则中的无量纲扣减系数，`k'` 是未来抽检均值波动对应的无量纲系数。三者相关，但处在不同位置：
+
+```math
+\text{声明：}\quad L_c=\mu+\Delta L
 ```
 
 ```math

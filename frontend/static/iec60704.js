@@ -94,7 +94,7 @@ function renderIecResult(data) {
   setText("#iecSigmaRValue", fmt(data.sigma_r));
   setText("#iecSigmaTValue", fmt(data.sigma_t));
   setText("#iecKValue", fmt(data.k_accept));
-  setText("#iecMarginValue", fmt(mode === "inspection" ? data.acceptance_margin : data.declaration_margin));
+  setText("#iecMarginValue", fmt(data.declaration_margin));
   setText("#iecClaimLabel", mode === "inspection" ? "现有宣称值 Lc" : data.claim.label);
   setText("#iecClaimValue", mode === "inspection" ? formatDbNullable(data.declared_value) : data.claim.text);
   setText("#iecInspectionMeanValue", fmt(data.inspection_mean));
@@ -102,14 +102,16 @@ function renderIecResult(data) {
   setText("#iecDeclaredCoverageValue", formatBadRateNullable(data.declared_coverage));
   setText("#iecDeclaredPaValue", formatRateNullable(data.declared_accept_probability));
   updateMarkerLegends(data.oc_plot);
-  const kProbability = mode === "inspection" ? "z_Pa" : `z_${formatProbabilitySymbol(data.reference_acceptance_probability)}`;
-  setText("#iecFormulaK", `k = z_(1-p1-α) - ${kProbability} / sqrt(n) = ${fmt(data.k_accept)}`);
-  setText("#iecFormulaSigmaT", `σt = sqrt(s² + σR²) = ${fmt(data.sigma_t)}`);
-  setText("#iecFormulaLc", `Lc = x\u0304 + kσM + z_Pa σt / sqrt(n) = ${fmt(data.recommended_declared_value)}`);
-  setText("#iecFormulaOc", `Pa(p) = Φ(sqrt(n) · (Φ⁻¹(1 - p) - ${fmt(data.k_accept)}))`);
+  setFormula("#iecFormulaK", `k = z_{1-p_{1-\\alpha}} - \\frac{z_{P_a}}{\\sqrt{n}} = ${fmt(data.k_accept)}`);
+  setFormula("#iecFormulaSigmaT", `\\sigma_t = \\sqrt{s^2 + \\sigma_R^2} = ${fmt(data.sigma_t)}`);
+  setFormula("#iecFormulaKPrime", `k' = \\frac{z_{P_a}}{\\sqrt{n}} = ${fmt(data.planning_k)}`);
+  setFormula("#iecFormulaMargin", `\\Delta L = k\\sigma_M + k'\\sigma_t = ${fmt(data.declaration_margin)}`);
+  setFormula("#iecFormulaLc", `L_c = \\bar{x} + \\Delta L = ${fmt(data.recommended_declared_value)}`);
+  setFormula("#iecFormulaOc", `P_a(p) = \\Phi\\left(\\sqrt{n}\\left(\\Phi^{-1}(1 - p) - ${fmt(data.k_accept)}\\right)\\right)`);
   drawOcChart(data.oc_plot);
   renderDeclarationTable(data.declaration_table || []);
   updateToolMode();
+  typesetMath();
 }
 
 function updateIecContext() {
@@ -127,9 +129,13 @@ function updateToolMode() {
   }
   document.querySelector(".chart-panel").hidden = mode !== "inspection";
   document.querySelector(".iec-bounds-grid").hidden = mode !== "inspection";
+  document.querySelector("#iecMarginCard").hidden = mode !== "declaration";
   declarationTablePanel.hidden = mode !== "declaration";
+  document.querySelector("#iecFormulaKPrime").hidden = mode !== "declaration";
+  document.querySelector("#iecFormulaMargin").hidden = mode !== "declaration";
   document.querySelector("#iecFormulaLc").hidden = mode !== "declaration";
   document.querySelector("#iecFormulaOc").hidden = mode !== "inspection";
+  typesetMath();
 }
 
 function updateMarkerLegends(plot) {
@@ -148,7 +154,7 @@ function renderDeclarationTable(rows) {
   }
   declarationTable.innerHTML = `
     <table class="result-table">
-      <thead><tr><th>p<sub>1-α</sub></th><th>Pa</th><th>k</th><th>K</th><th>推荐 L<sub>c</sub></th></tr></thead>
+      <thead><tr><th>p<sub>1-α</sub></th><th>Pa</th><th>k</th><th>ΔL</th><th>推荐 L<sub>c</sub></th></tr></thead>
       <tbody>${rows
         .map(
           (row) =>
@@ -323,6 +329,16 @@ function nearestIndex(values, target) {
 
 function setText(selector, value) {
   document.querySelector(selector).textContent = value;
+}
+
+function setFormula(selector, latex) {
+  document.querySelector(selector).textContent = `\\(${latex}\\)`;
+}
+
+function typesetMath() {
+  if (window.MathJax?.typesetPromise) {
+    window.MathJax.typesetPromise(document.querySelectorAll(".rank-summary, .theory-panel:not([hidden])")).catch(() => {});
+  }
 }
 
 function fmt(value) {

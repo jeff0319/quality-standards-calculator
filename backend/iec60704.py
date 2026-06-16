@@ -5,7 +5,6 @@ from statistics import NormalDist, mean, stdev
 from typing import Iterable
 
 NORMAL = NormalDist()
-REFERENCE_ACCEPTANCE_PROBABILITY = 0.95
 
 
 def run_iec60704_declaration(
@@ -42,11 +41,12 @@ def run_iec60704_declaration(
     coverage = 1 - p
 
     z_pa = NORMAL.inv_cdf(pa)
+    planning_k = z_pa / sqrt(n)
     inspection_k_accept = acceptance_k(n, coverage, pa)
-    declaration_k_accept = acceptance_k(n, coverage, REFERENCE_ACCEPTANCE_PROBABILITY)
+    declaration_k_accept = acceptance_k(n, coverage, pa)
     display_k_accept = inspection_k_accept if mode == "inspection" else declaration_k_accept
     margin_k_sigma = declaration_k_accept * sigma_m
-    planning_margin = z_pa / sqrt(n) * total_std
+    planning_margin = planning_k * total_std
     declaration_margin = margin_k_sigma + planning_margin
     recommended_declared_value = sample_mean + declaration_margin
 
@@ -89,9 +89,9 @@ def run_iec60704_declaration(
         "k_accept": display_k_accept,
         "declaration_k_accept": declaration_k_accept,
         "inspection_k_accept": inspection_k_accept,
-        "reference_acceptance_probability": REFERENCE_ACCEPTANCE_PROBABILITY,
         "acceptance_margin": inspection_k_accept * sigma_m,
         "margin_k_sigma": margin_k_sigma,
+        "planning_k": planning_k,
         "planning_margin": planning_margin,
         "declaration_margin": declaration_margin,
         "recommended_declared_value": recommended_declared_value,
@@ -141,8 +141,8 @@ def build_declaration_table(
     pa_values = unique_rates([selected_pa, 0.95, 0.99, 0.999])
     rows: list[dict[str, float | str]] = []
     for p in p_values:
-        k_factor = acceptance_k(n, 1 - p, REFERENCE_ACCEPTANCE_PROBABILITY)
         for pa in pa_values:
+            k_factor = acceptance_k(n, 1 - p, pa)
             declaration_margin = k_factor * sigma_m + NORMAL.inv_cdf(pa) / sqrt(n) * sigma_t
             declared_value = sample_mean + declaration_margin
             rows.append(

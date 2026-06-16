@@ -41,6 +41,11 @@ textarea {
   padding: 22px;
 }
 
+.app-shell {
+  height: 100dvh;
+  overflow: hidden;
+}
+
 .home-shell {
   display: grid;
   min-height: 100vh;
@@ -162,8 +167,10 @@ h2 {
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);
   grid-template-areas: "left results";
+  height: calc(100dvh - 44px);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  overflow: hidden;
 }
 
 .panel,
@@ -177,11 +184,17 @@ h2 {
 }
 
 .left-stack {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 2px;
   display: grid;
   grid-area: left;
   gap: 16px;
-  position: sticky;
-  top: 22px;
+  align-content: start;
 }
 
 .controls {
@@ -411,9 +424,18 @@ textarea:focus {
 }
 
 .main-stack {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 2px;
+  padding-bottom: 16px;
   display: grid;
   grid-area: results;
   gap: 12px;
+  align-content: start;
 }
 
 .status-card {
@@ -476,7 +498,11 @@ textarea:focus {
 }
 
 .iec-summary-grid {
-  grid-template-columns: 0.7fr 1fr 1fr 1fr 1fr 1fr 0.8fr 0.9fr minmax(180px, 1.4fr);
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+}
+
+.iec-summary-grid .claim {
+  grid-column: span 2;
 }
 
 .iec-summary-grid article > span,
@@ -500,20 +526,26 @@ textarea:focus {
 }
 
 .chart-panel {
-  overflow: hidden;
+  min-width: 0;
+  overflow: visible;
+  padding-bottom: 6px;
   box-shadow: none;
 }
 
 #chart {
   display: block;
+  min-width: 0;
   width: 100%;
   height: 390px;
+  overflow: visible;
 }
 
 #iecOcChart {
   display: block;
+  min-width: 0;
   width: 100%;
   height: 390px;
+  overflow: visible;
 }
 
 .hover-capture {
@@ -761,10 +793,22 @@ textarea:focus {
 }
 
 .rank-summary span {
+  display: inline-flex;
+  align-items: center;
   padding: 6px 8px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: #f8fafc;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  line-height: 1.25;
+  min-height: 36px;
+  overflow-wrap: anywhere;
+}
+
+.rank-summary mjx-container {
+  margin: 0 !important;
+  line-height: 1;
+  vertical-align: middle !important;
 }
 
 .result-badge {
@@ -905,25 +949,47 @@ textarea:focus {
 }
 
 .equation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
   text-align: center;
+}
+
+.equation mjx-container[display="true"],
+.equation-list mjx-container[display="true"] {
+  flex: 0 0 auto;
+  margin: 0 !important;
+  line-height: 1;
+  vertical-align: middle !important;
 }
 
 .equation-list {
   display: grid;
+  align-items: center;
   gap: 6px;
   text-align: left;
 }
 
 @media (max-width: 1000px) {
+  .app-shell {
+    height: auto;
+    overflow: visible;
+  }
+
   .layout {
     grid-template-columns: 1fr;
     grid-template-areas:
       "left"
       "results";
+    height: auto;
+    overflow: visible;
   }
 
-  .left-stack {
-    position: static;
+  .left-stack,
+  .main-stack {
+    overflow: visible;
+    padding-right: 0;
   }
 
   .summary-grid {
@@ -951,6 +1017,10 @@ textarea:focus {
   .bounds-grid,
   .home-grid {
     grid-template-columns: 1fr;
+  }
+
+  .iec-summary-grid .claim {
+    grid-column: auto;
   }
 
   #validationForm[data-scenario="upper"] [data-spec-field="usl"] {
